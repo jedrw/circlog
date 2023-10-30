@@ -1,0 +1,33 @@
+package circleci
+
+import (
+	"fmt"
+
+	"github.com/lupinelab/circlog/config"
+)
+
+type Workflow struct {
+	PipelineId     string `json:"pipeline_id"`
+	CanceledBy     string `json:"canceled_by"`
+	Id             string `json:"id"`
+	Name           string `json:"name"`
+	ProjectSlug    string `json:"project_slug"`
+	ErroredBy      string `json:"errored_by"`
+	Tag            string `json:"tag"`
+	Status         string `json:"status"`
+	StartedBy      string `json:"started_by"`
+	PipelineNumber int    `json:"pipeline_number"`
+	CreatedAt      string `json:"created_at"`
+	StoppedAt      string `json:"stopped_at"`
+}
+
+func GetPipelineWorkflows(config config.CirclogConfig, project string, pipelineId string) ([]Workflow, error) {
+	url := fmt.Sprintf("%s/pipeline/%s/workflow", CIRCLECI_ENDPOINT_V2, pipelineId)
+
+	workflows, err := collectPaginatedResponses[Workflow](url, config)
+	if err != nil {
+		return []Workflow{}, err
+	}
+
+	return workflows, err
+}

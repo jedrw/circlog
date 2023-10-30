@@ -1,0 +1,92 @@
+package circleci
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/lupinelab/circlog/config"
+)
+
+const (
+	// CircleCi Api Endpoints
+	CIRCLECI_ENDPOINT_V1 = "https://circleci.com/api/v1.1"
+	CIRCLECI_ENDPOINT_V2 = "https://circleci.com/api/v2"
+
+	// Status types
+	SUCCESS      = "success"
+	RUNING       = "running"
+	NOT_RUN      = "not_run"
+	FAILED       = "failed"
+	ERROR        = "error"
+	FAILING      = "failing"
+	ONHOLD       = "on_hold"
+	CANCELED     = "canceled"
+	UNAUTHORIZED = "unauthorized"
+
+	// Job types
+	BUILD    = "build"
+	APPROVAL = "approval"
+)
+
+type ResponseType interface {
+	Pipeline | Workflow | Job | JobDetails
+}
+
+type ApiResponse[T ResponseType] struct {
+	NextPageToken string `json:"next_page_token"`
+	Items         []T    `json:"items"`
+}
+
+func New[T ResponseType](object T) *ApiResponse[T] {
+	return &ApiResponse[T]{}
+}
+
+func parseResponseBody[T ResponseType](responseBody []byte) (*ApiResponse[T], error) {
+	parsedApiResponse := new(ApiResponse[T])
+	err := json.Unmarshal(responseBody, &parsedApiResponse)
+
+	return parsedApiResponse, err
+}
+
+func collectPaginatedResponses[T ResponseType](url string, config config.CirclogConfig) ([]T, error) {
+	items := []T{}
+	nextPageToken := ""
+	newItems := true
+
+	for newItems {
+		endpoint := fmt.Sprintf("%s/%s", url, nextPageToken)
+
+		req, err := http.NewRequest("GET", endpoint, nil)
+		if err != nil {
+			return items, err
+		}
+
+		req.Header.Add("Circle-Token", config.Token)
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return items, err
+		}
+
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+
+		parsedResponse, err := parseResponseBody[T](body)
+		if err != nil {
+			return items, err
+		}
+
+		items = append(items, parsedResponse.Items...)
+
+		if parsedResponse.NextPageToken != "" {
+			nextPageToken = fmt.Sprintf("?page-token=%s", parsedResponse.NextPageToken)
+		} else {
+			newItems = false
+		}
+
+	}
+
+	return items, nil
+}
