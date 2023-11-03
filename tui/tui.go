@@ -25,7 +25,12 @@ func Run(config config.CirclogConfig, project string) {
 
 	heading := tview.NewFlex().SetDirection(tview.FlexColumn)
 
-	info := tview.NewTextView().SetText(fmt.Sprintf("Organisation: %s\nProject: %s", config.Org, project))
+	branch := config.Branch
+	if config.Branch == "" {
+		branch = "ALL"
+	}
+	
+	info := tview.NewTextView().SetText(fmt.Sprintf("Organisation: %s\nProject: %s\nBranch: %s", config.Org, project, branch))
 	heading.AddItem(info, 0, 1, false)
 
 	controls = tview.NewTextView().SetTextAlign(tview.AlignRight)

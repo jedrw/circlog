@@ -50,7 +50,7 @@ type JobDetails struct {
 	Steps []Step `json:"steps"`
 }
 
-func GetWorkflowJobs(config config.CirclogConfig, project string, workflowId string) ([]Job, error) {
+func GetWorkflowJobs(config config.CirclogConfig, workflowId string) ([]Job, error) {
 	url := fmt.Sprintf("%s/workflow/%s/job", CIRCLECI_ENDPOINT_V2, workflowId)
 
 	jobs, err := collectPaginatedResponses[Job](url, config)

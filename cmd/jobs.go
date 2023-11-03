@@ -16,16 +16,17 @@ var jobsCmd = &cobra.Command{
 		project := args[0]
 		vcs, _ := cmd.Flags().GetString("vcs")
 		org, _ := cmd.Flags().GetString("org")
+		branch, _ := cmd.Flags().GetString("branch")
 
 		workflowId, _ := cmd.Flags().GetString("workflow-id")
 
-		config, err := config.NewConfig(vcs, org)
+		config, err := config.NewConfig(project, vcs, org, branch)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		workflowJobs, err := circleci.GetWorkflowJobs(config, project, workflowId)
+		workflowJobs, err := circleci.GetWorkflowJobs(config, workflowId)
 		if err != nil {
 			fmt.Println(err.Error())
 		}

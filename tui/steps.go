@@ -37,7 +37,7 @@ func updateStepsTree(config config.CirclogConfig, project string, job circleci.J
 		updateLogsView(config, project, job, action, logsView)
 	})
 
-	steps, _ := circleci.GetJobSteps(config, project, job.JobNumber)
+	steps, _ := circleci.GetJobSteps(config, job.JobNumber)
 
 	if len(steps.Steps) != 0 {
 		for i, step := range steps.Steps {

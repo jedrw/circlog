@@ -25,9 +25,11 @@ type circlogState struct {
 }
 
 type CirclogConfig struct {
-	Org   string `yaml:"organisation"`
-	Token string
-	Vcs   string `yaml:"vcs"`
+	Branch  string
+	Org     string `yaml:"organisation"`
+	Project string
+	Token   string
+	Vcs     string `yaml:"vcs"`
 }
 
 func GetToken() (string, bool, error) {
@@ -152,7 +154,7 @@ func updateConfig(config *CirclogConfig, vcs string, org string) error {
 	return nil
 }
 
-func NewConfig(vcs string, org string) (CirclogConfig, error) {
+func NewConfig(project string, vcs string, org string, branch string) (CirclogConfig, error) {
 	err := ensureConfigDir()
 	if err != nil {
 		return CirclogConfig{}, err
@@ -188,17 +190,19 @@ func NewConfig(vcs string, org string) (CirclogConfig, error) {
 		return CirclogConfig{}, errors.New("could not find token in either 'CIRCLECI_TOKEN' env var or CircleCi Cli config.yml")
 	}
 
+	config.Project= project
 	config.Token = token
+	config.Branch = branch
 
 	return config, nil
 }
 
-func (config *CirclogConfig) ProjectSlugV2(project string) string {
+func (config *CirclogConfig) ProjectSlugV2() string {
 	vcs := VCSV1ToV2[config.Vcs]
 
-	return fmt.Sprintf("%s/%s/%s", vcs, config.Org, project)
+	return fmt.Sprintf("%s/%s/%s", vcs, config.Org, config.Project)
 }
 
-func (config *CirclogConfig) ProjectSlugV1(project string) string {
-	return fmt.Sprintf("%s/%s/%s", config.Vcs, config.Org, project)
+func (config *CirclogConfig) ProjectSlugV1() string {
+	return fmt.Sprintf("%s/%s/%s", config.Vcs, config.Org, config.Project)
 }

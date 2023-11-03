@@ -57,8 +57,8 @@ type Pipeline struct {
 	Vcs               Vcs                       `json:"vcs"`
 }
 
-func GetProjectPipelines(config config.CirclogConfig, project string) ([]Pipeline, error) {
-	url := fmt.Sprintf("%s/project/%s/pipeline", CIRCLECI_ENDPOINT_V2, config.ProjectSlugV2(project))
+func GetProjectPipelines(config config.CirclogConfig) ([]Pipeline, error) {
+	url := fmt.Sprintf("%s/project/%s/pipeline", CIRCLECI_ENDPOINT_V2, config.ProjectSlugV2())
 
 	pipelines, err := collectPaginatedResponses[Pipeline](url, config)
 	if err != nil {

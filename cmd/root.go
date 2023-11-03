@@ -16,8 +16,9 @@ var rootCmd = &cobra.Command{
 		project := args[0]
 		vcs, _ := cmd.Flags().GetString("vcs")
 		org, _ := cmd.Flags().GetString("org")
+		branch, _ := cmd.Flags().GetString("branch")
 
-		config, err := config.NewConfig(vcs, org)
+		config, err := config.NewConfig(project, vcs, org, branch)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -38,6 +39,7 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringP("vcs", "v", "", "Version Control System")
 	rootCmd.PersistentFlags().StringP("org", "o", "", "Organisation")
+	rootCmd.Flags().StringP("branch", "b", "", "Branch")
 
 	rootCmd.AddCommand(pipelinesCmd)
 	rootCmd.AddCommand(workflowsCmd)

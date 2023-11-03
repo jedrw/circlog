@@ -17,7 +17,7 @@ func newLogsView() *tview.TextView {
 }
 
 func updateLogsView(config config.CirclogConfig, project string, job circleci.Job, action circleci.Action, logsview *tview.TextView) {
-	logs, _ := circleci.GetStepLogs(config, project, job.JobNumber, action.Step, action.Index, action.AllocationId)
+	logs, _ := circleci.GetStepLogs(config, job.JobNumber, action.Step, action.Index, action.AllocationId)
 	logsview.SetText(logs).ScrollToBeginning()
 
 	logsView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {

@@ -33,7 +33,7 @@ func newJobsTable(config config.CirclogConfig, project string) *tview.Table {
 }
 
 func updateJobsTable(config config.CirclogConfig, project string, workflow circleci.Workflow, jobsTable *tview.Table) {
-	jobs, _ := circleci.GetWorkflowJobs(config, project, workflow.Id)
+	jobs, _ := circleci.GetWorkflowJobs(config, workflow.Id)
 
 	jobsTable.Clear()
 

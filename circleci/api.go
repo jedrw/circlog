@@ -52,11 +52,18 @@ func parseResponseBody[T ResponseType](responseBody []byte) (*ApiResponse[T], er
 
 func collectPaginatedResponses[T ResponseType](url string, config config.CirclogConfig) ([]T, error) {
 	items := []T{}
-	nextPageToken := ""
+	var nextPageToken string
+	var branch string
 	newItems := true
 
 	for newItems {
-		endpoint := fmt.Sprintf("%s/%s", url, nextPageToken)
+		if nextPageToken != "" && config.Branch != "" {
+			branch = fmt.Sprintf("&branch=%s", config.Branch)
+		} else if config.Branch != "" {
+			branch = fmt.Sprintf("?branch=%s", config.Branch)
+		}
+
+		endpoint := fmt.Sprintf("%s%s%s", url, nextPageToken, branch)
 
 		req, err := http.NewRequest("GET", endpoint, nil)
 		if err != nil {

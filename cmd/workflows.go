@@ -16,10 +16,11 @@ var workflowsCmd = &cobra.Command{
 		project := args[0]
 		vcs, _ := cmd.Flags().GetString("vcs")
 		org, _ := cmd.Flags().GetString("org")
+		branch, _ := cmd.Flags().GetString("branch")
 
 		pipelineId, _ := cmd.Flags().GetString("pipeline-id")
 
-		config, err := config.NewConfig(vcs, org)
+		config, err := config.NewConfig(project, vcs, org, branch)
 		if err != nil {
 			fmt.Println(err.Error())
 			return

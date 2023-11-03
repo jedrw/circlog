@@ -16,16 +16,17 @@ var stepsCmd = &cobra.Command{
 		project := args[0]
 		vcs, _ := cmd.Flags().GetString("vcs")
 		org, _ := cmd.Flags().GetString("org")
+		branch, _ := cmd.Flags().GetString("branch")
 
 		jobNumber, _ := cmd.Flags().GetInt64("job-number")
 
-		config, err := config.NewConfig(vcs, org)
+		config, err := config.NewConfig(project, vcs, org, branch)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		workflowJobs, err := circleci.GetJobSteps(config, project, jobNumber)
+		workflowJobs, err := circleci.GetJobSteps(config, jobNumber)
 		if err != nil {
 			fmt.Println(err.Error())
 		}

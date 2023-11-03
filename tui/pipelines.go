@@ -32,7 +32,7 @@ func newPipelinesTable(config config.CirclogConfig, project string) *tview.Table
 }
 
 func updatePipelinesTable(config config.CirclogConfig, project string, pipelinesTable *tview.Table) {
-	pipelines, _ := circleci.GetProjectPipelines(config, project)
+	pipelines, _ := circleci.GetProjectPipelines(config)
 
 	if len(pipelines) != 0 {
 		for row, pipeline := range pipelines {
