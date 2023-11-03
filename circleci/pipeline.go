@@ -2,6 +2,7 @@ package circleci
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/lupinelab/circlog/config"
 )
@@ -17,9 +18,9 @@ type Actor struct {
 }
 
 type PipelineTrigger struct {
-	ReceivedAt string `json:"received_at"`
-	Type       string `json:"type"`
-	Actor      Actor  `json:"actor"`
+	ReceivedAt time.Time `json:"received_at"`
+	Type       string    `json:"type"`
+	Actor      Actor     `json:"actor"`
 }
 
 type PipelineTriggerParameters struct {
@@ -47,11 +48,11 @@ type Pipeline struct {
 	Id                string                    `json:"id"`
 	Errors            []PipelineError           `json:"errors"`
 	ProjectSlug       string                    `json:"project_slug"`
-	UpdatedAt         string                    `json:"updated_at"`
+	UpdatedAt         time.Time                 `json:"updated_at"`
 	Number            int                       `json:"number"`
 	TriggerParameters PipelineTriggerParameters `json:"trigger_parameters"`
 	State             string                    `json:"state"`
-	CreatedAt         string                    `json:"created_at"`
+	CreatedAt         time.Time                 `json:"created_at"`
 	Trigger           PipelineTrigger           `json:"trigger"`
 	Vcs               Vcs                       `json:"vcs"`
 }

@@ -5,31 +5,32 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/lupinelab/circlog/config"
 )
 
 type Action struct {
-	Index              int64  `json:"index"`
-	Step               int64  `json:"step"`
-	AllocationId       string `json:"allocation_id"`
-	Name               string `json:"name"`
-	Type               string `json:"type"`
-	StartTime          string `json:"start_time"`
-	Truncated          bool   `json:"truncated"`
-	Parallel           bool   `json:"parallel"`
-	BashCommand        string `json:"bash_command"`
-	Background         bool   `json:"background"`
-	Insignificant      bool   `json:"insignificant"`
-	HasOutput          bool   `json:"has_output"`
-	Continue           bool   `json:"continue"`
-	ExitCode           int64  `json:"exit_code"`
-	OutputUrl          string `json:"output_url"`
-	Status             string `json:"status"`
-	Failed             bool   `json:"failed"`
-	InfrastructureFail bool   `json:"infrastructure_fail"`
-	Timedout           bool   `json:"timedout"`
-	Canceled           bool   `json:"canceled"`
+	Index              int64     `json:"index"`
+	Step               int64     `json:"step"`
+	AllocationId       string    `json:"allocation_id"`
+	Name               string    `json:"name"`
+	Type               string    `json:"type"`
+	StartTime          time.Time `json:"start_time"`
+	Truncated          bool      `json:"truncated"`
+	Parallel           bool      `json:"parallel"`
+	BashCommand        string    `json:"bash_command"`
+	Background         bool      `json:"background"`
+	Insignificant      bool      `json:"insignificant"`
+	HasOutput          bool      `json:"has_output"`
+	Continue           bool      `json:"continue"`
+	ExitCode           int64     `json:"exit_code"`
+	OutputUrl          string    `json:"output_url"`
+	Status             string    `json:"status"`
+	Failed             bool      `json:"failed"`
+	InfrastructureFail bool      `json:"infrastructure_fail"`
+	Timedout           bool      `json:"timedout"`
+	Canceled           bool      `json:"canceled"`
 }
 
 type Step struct {

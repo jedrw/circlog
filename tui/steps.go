@@ -3,46 +3,67 @@ package tui
 import (
 	"fmt"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
 	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
 
-func ShowSteps(config config.CirclogConfig, project string, job circleci.Job, app *tview.Application, layout *tview.Flex) {
-	stepsArea := tview.NewFlex()
-	stepsArea.SetTitle(fmt.Sprintf(" %s - STEPS ", job.Name)).SetBorder(true)
+func newStepsTree() *tview.TreeView {
+	stepsTree := tview.NewTreeView()
+	stepsTree.SetTitle(" STEPS ").SetBorder(true)
 
+	stepsTree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+			stepsTree.GetRoot().ClearChildren()
+			app.SetFocus(jobsTable)
+		}
+		return event
+	})
+
+	return stepsTree
+}
+
+func updateStepsTree(config config.CirclogConfig, project string, job circleci.Job) {
 	jobNode := tview.NewTreeNode(job.Name)
-	stepsTree := tview.NewTreeView().
-		SetRoot(jobNode).
+
+	stepsTree.SetRoot(jobNode).
 		SetCurrentNode(jobNode).
 		SetGraphics((false)).
 		SetTopLevel(1)
 
-	steps, _ := circleci.GetJobSteps(config, project, job.JobNumber)
-
-	for _, step := range steps.Steps {
-		stepNode := tview.NewTreeNode(step.Name).
-			SetSelectable(false).
-			SetReference(step)
-		jobNode.AddChild(stepNode)
-		for _, action := range step.Actions {
-			actionNode := tview.NewTreeNode(fmt.Sprint(action.Index)).
-				SetSelectable(true).
-				SetReference(action).
-				SetColor(ColourByStatus[action.Status])
-			stepNode.AddChild(actionNode)
-		}
-	}
-
 	stepsTree.SetSelectedFunc(func(node *tview.TreeNode) {
-		action := node.GetReference()
-		layout.RemoveItem(stepsArea)
-		ShowLogs(config, project, job.JobNumber, action.(circleci.Action), app, layout)
+		action := node.GetReference().(circleci.Action)
+		updateLogsView(config, project, job, action, logsView)
 	})
 
-	stepsArea.AddItem(stepsTree, 0, 1, false)
-	layout.AddItem(stepsArea, 0, 1, false)
+	steps, _ := circleci.GetJobSteps(config, project, job.JobNumber)
+
+	if len(steps.Steps) != 0 {
+		for i, step := range steps.Steps {
+			stepNode := tview.NewTreeNode(step.Name).
+				SetSelectable(false).
+				SetReference(step)
+			jobNode.AddChild(stepNode)
+			for _, action := range step.Actions {
+				var actionDuration string
+				if i == len(steps.Steps)-1 {
+					actionDuration = job.StoppedAt.Sub(action.StartTime).String()
+				} else {
+					actionDuration = steps.Steps[i+1].Actions[0].StartTime.Sub(action.StartTime).String()
+				}
+
+				actionNode := tview.NewTreeNode(fmt.Sprintf("%d (%s)", action.Index, actionDuration)).
+					SetSelectable(true).
+					SetReference(action).
+					SetColor(colourByStatus[action.Status])
+				stepNode.AddChild(actionNode)
+			}
+		}
+	} else {
+		noneNode := tview.NewTreeNode("None").SetSelectable(false)
+		jobNode.AddChild(noneNode)
+	}
 
 	app.SetFocus(stepsTree)
 }

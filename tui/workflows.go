@@ -1,45 +1,56 @@
 package tui
 
 import (
-	"fmt"
-
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
 	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
 
-func ShowWorkflows(config config.CirclogConfig, project string, pipeline circleci.Pipeline, app *tview.Application, layout *tview.Flex) {
-	workflowsArea := tview.NewFlex()
-	workflowsArea.SetTitle(fmt.Sprintf(" %d - WORKFLOWS ", pipeline.Number)).SetBorder(true)
+func newWorkflowsTable(config config.CirclogConfig, project string) *tview.Table {
+	workflowsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0)
+	workflowsTable.SetTitle(" WORKFLOWS ").SetBorder(true)
 
-	workflowsTable := tview.NewTable().SetBorders(true)
-	workflowsTable.SetSelectable(true, false)
-
-	for column, header := range []string{"Name", "Created At"} {
-		workflowsTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)))
-	}
-
-	workflows, _ := circleci.GetPipelineWorkflows(config, project, pipeline.Id)
-
-	for row, workflow := range workflows {
-		for column, attr := range []string{workflow.Name, workflow.CreatedAt} {
-			cell := tview.NewTableCell(attr).SetStyle(StyleForStatus(workflow.Status))
-			cell.SetReference(workflow)
-			workflowsTable.SetCell(row+1, column, cell)
+	workflowsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+			workflowsTable.Clear()
+			app.SetFocus(pipelinesTable)
 		}
-	}
-
-	workflowsTable.Select(1, 1)
-	workflowsTable.SetSelectedFunc(func(row int, col int) {
-		cell := workflowsTable.GetCell(row, 0)
-		workflow := cell.GetReference()
-		layout.RemoveItem(workflowsArea)
-		ShowJobs(config, project, workflow.(circleci.Workflow), app, layout)
+		return event
 	})
 
-	workflowsArea.AddItem(workflowsTable, 0, 1, false)
-	layout.AddItem(workflowsArea, 0, 1, false)
+	workflowsTable.SetSelectedFunc(func(row int, col int) {
+		cell := workflowsTable.GetCell(row, 0)
+		if cell.Text != "None" {
+			workflow := cell.GetReference().(circleci.Workflow)
+			updateJobsTable(config, project, workflow, jobsTable)
+		}
+	})
+
+	return workflowsTable
+}
+
+func updateWorkflowsTable(config config.CirclogConfig, project string, pipeline circleci.Pipeline, workflowsTable *tview.Table) {
+	workflows, _ := circleci.GetPipelineWorkflows(config, project, pipeline.Id)
+
+	workflowsTable.Clear()
+
+	for column, header := range []string{"Name", "Duration"} {
+		workflowsTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
+	}
+
+	if len(workflows) != 0 {
+		for row, workflow := range workflows {
+			for column, attr := range []string{workflow.Name, workflow.StoppedAt.Sub(workflow.CreatedAt).String()} {
+				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(workflow.Status))
+				cell.SetReference(workflow)
+				workflowsTable.SetCell(row+1, column, cell)
+			}
+		}
+	} else {
+		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
+		workflowsTable.SetCell(1, 0, cell)
+	}
 
 	app.SetFocus(workflowsTable)
 }

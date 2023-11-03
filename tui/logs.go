@@ -9,20 +9,33 @@ import (
 	"github.com/rivo/tview"
 )
 
-func ShowLogs(config config.CirclogConfig, project string, jobNumber int64, action circleci.Action, app *tview.Application, layout *tview.Flex) {
-	logsArea := tview.NewFlex()
-	logsArea.SetTitle(fmt.Sprintf(" %s - LOGS ", action.Name)).SetBorder(true)
+func newLogsView() *tview.TextView {
+	logsView := tview.NewTextView()
+	logsView.SetTitle(" LOGS ").SetBorder(true).SetBorderPadding(0, 0, 1, 1)
 
-	logs, _ := circleci.GetStepLogs(config, project, jobNumber, action.Step, action.Index, action.AllocationId)
-	logsOutput := tview.NewTextView().SetText(logs)
+	return logsView
+}
 
-	logsOutput.SetDoneFunc(func(key tcell.Key) {
-		app.Stop()
-		fmt.Printf("circlog logs %s -j %d -s %d -i %d -a \"%s\"\n", project, jobNumber, action.Step, action.Index, action.AllocationId)
+func updateLogsView(config config.CirclogConfig, project string, job circleci.Job, action circleci.Action, logsview *tview.TextView) {
+	logs, _ := circleci.GetStepLogs(config, project, job.JobNumber, action.Step, action.Index, action.AllocationId)
+	logsview.SetText(logs).ScrollToBeginning()
+
+	logsView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+			logsView.Clear()
+			controls.SetText(controlBindings)
+			app.SetFocus(stepsTree)
+		}
+
+		if event.Rune() == 'd' {
+			app.Stop()
+			fmt.Printf("circlog logs %s -j %d -s %d -i %d -a \"%s\"\n", project, job.JobNumber, action.Step, action.Index, action.AllocationId)
+		}
+
+		return event
 	})
 
-	logsArea.AddItem(logsOutput, 0, 1, false)
-	layout.AddItem(logsArea, 0, 1, false)
+	controls.SetText(controlBindings + "Dump Logs Command        [D]")
 
-	app.SetFocus(logsOutput)
+	app.SetFocus(logsview)
 }
