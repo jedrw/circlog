@@ -5,26 +5,35 @@ import (
 	"github.com/lupinelab/circlog/circleci"
 )
 
-var ColourByStatus = map[string]tcell.Color{
-	"success":      tcell.ColorDarkGreen,
-	"running":      tcell.ColorLightGreen,
-	"not_run":      tcell.ColorGray,
-	"failed":       tcell.ColorDarkRed,
-	"error":        tcell.ColorDarkRed,
-	"failing":      tcell.ColorPink,
-	"on_hold":      tcell.ColorYellow,
-	"canceled":     tcell.ColorDarkRed,
-	"unauthorized": tcell.ColorDarkRed,
+var (
+	colourByStatus = map[string]tcell.Color{
+		"success":      tcell.ColorDarkGreen,
+		"running":      tcell.ColorLightGreen,
+		"not_run":      tcell.ColorGray,
+		"failed":       tcell.ColorDarkRed,
+		"error":        tcell.ColorDarkRed,
+		"failing":      tcell.ColorPink,
+		"on_hold":      tcell.ColorYellow,
+		"canceled":     tcell.ColorDarkRed,
+		"unauthorized": tcell.ColorDarkRed,
 
-	"created":       tcell.ColorLightGreen,
-	"errored":       tcell.ColorDarkRed,
-	"setup-pending": tcell.ColorGrey,
-	"setup":         tcell.ColorDefault,
-	"pending":       tcell.ColorYellowGreen,
-}
+		"created":       tcell.ColorLightGreen,
+		"errored":       tcell.ColorDarkRed,
+		"setup-pending": tcell.ColorGrey,
+		"setup":         tcell.ColorLightGray,
+		"pending":       tcell.ColorYellowGreen,
+	}
 
-func StyleForStatus(status string) tcell.Style {
-	return tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(ColourByStatus[status])
+	controlBindings = `
+		Move	           [Up/Down]
+		Select               [Enter]
+		Back         [Esc/Backspace]
+		Quit                [Ctrl+C]
+	`
+)
+
+func styleForStatus(status string) tcell.Style {
+	return tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(colourByStatus[status])
 }
 
 func branchOrTag(pipeline circleci.Pipeline) string {

@@ -2,23 +2,24 @@ package circleci
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/lupinelab/circlog/config"
 )
 
 type Job struct {
-	CanceledBy        string   `json:"canceled_by"`
-	Dependencies      []string `json:"dependencies"`
-	JobNumber         int64    `json:"job_number"`
-	Id                string   `json:"id"`
-	StartedAt         string   `json:"started_at"`
-	Name              string   `json:"name"`
-	ApprovedBy        string   `json:"approved_by"`
-	ProjectSlug       string   `json:"project_slug"`
-	Status            string   `json:"status"`
-	Type              string   `json:"type"`
-	StoppedAt         string   `json:"stopped_at"`
-	ApprovalRequestId string   `json:"approval_request_id"`
+	CanceledBy        string    `json:"canceled_by"`
+	Dependencies      []string  `json:"dependencies"`
+	JobNumber         int64     `json:"job_number"`
+	Id                string    `json:"id"`
+	StartedAt         time.Time `json:"started_at"`
+	Name              string    `json:"name"`
+	ApprovedBy        string    `json:"approved_by"`
+	ProjectSlug       string    `json:"project_slug"`
+	Status            string    `json:"status"`
+	Type              string    `json:"type"`
+	StoppedAt         time.Time `json:"stopped_at"`
+	ApprovalRequestId string    `json:"approval_request_id"`
 }
 
 type ParallelRun struct {

@@ -9,40 +9,41 @@ import (
 	"github.com/rivo/tview"
 )
 
-func ShowPipelines(config config.CirclogConfig, project string, app *tview.Application, layout *tview.Flex) *tview.Table {
-	pipelinesArea := tview.NewFlex()
-	pipelinesArea.SetTitle(" PIPELINES ").SetBorder(true)
-
-	pipelinesTable := tview.NewTable().SetBorders(true)
-	pipelinesTable.SetSelectable(true, false)
+func newPipelinesTable(config config.CirclogConfig, project string) *tview.Table {
+	pipelinesTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0)
+	pipelinesTable.SetTitle(" PIPELINES ").SetBorder(true)
 
 	for column, header := range []string{"Number", "Branch/Tag", "Start"} {
-		pipelinesTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)))
-	}
-
-	pipelines, _ := circleci.GetProjectPipelines(config, project)
-
-	for row, pipeline := range pipelines {
-		for column, attr := range []string{fmt.Sprint(pipeline.Number), branchOrTag(pipeline), pipeline.CreatedAt} {
-			cell := tview.NewTableCell(attr).SetStyle(StyleForStatus(pipeline.State))
-			cell.SetReference(pipeline)
-			pipelinesTable.SetCell(row+1, column, cell)
-		}
-
+		pipelinesTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
 	}
 
 	pipelinesTable.Select(1, 1)
 	pipelinesTable.SetSelectedFunc(func(row int, col int) {
 		cell := pipelinesTable.GetCell(row, 0)
-		pipeline := cell.GetReference()
-		layout.RemoveItem(pipelinesArea)
-		ShowWorkflows(config, project, pipeline.(circleci.Pipeline), app, layout)
+		if cell.Text != "None" {
+			pipeline := cell.GetReference().(circleci.Pipeline)
+			updateWorkflowsTable(config, project, pipeline, workflowsTable)
+		}
 	})
 
-	pipelinesArea.AddItem(pipelinesTable, 0, 1, false)
-	layout.AddItem(pipelinesArea, 0, 1, false)
-
-	app.SetFocus(pipelinesTable)
+	updatePipelinesTable(config, project, pipelinesTable)
 
 	return pipelinesTable
+}
+
+func updatePipelinesTable(config config.CirclogConfig, project string, pipelinesTable *tview.Table) {
+	pipelines, _ := circleci.GetProjectPipelines(config, project)
+
+	if len(pipelines) != 0 {
+		for row, pipeline := range pipelines {
+			for column, attr := range []string{fmt.Sprint(pipeline.Number), branchOrTag(pipeline), pipeline.CreatedAt.Local().String()} {
+				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(pipeline.State))
+				cell.SetReference(pipeline)
+				pipelinesTable.SetCell(row+1, column, cell)
+			}
+		}
+	} else {
+		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
+		pipelinesTable.SetCell(1, 0, cell)
+	}
 }
