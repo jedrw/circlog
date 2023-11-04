@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
@@ -10,20 +11,12 @@ import (
 )
 
 func newJobsTable(config config.CirclogConfig, project string) *tview.Table {
-	jobsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0)
+	jobsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 	jobsTable.SetTitle(" JOBS ").SetBorder(true)
-
-	jobsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
-			jobsTable.Clear()
-			app.SetFocus(workflowsTable)
-		}
-		return event
-	})
 
 	jobsTable.SetSelectedFunc(func(row int, col int) {
 		cell := jobsTable.GetCell(row, 0)
-		if cell.Text != "None" {
+		if cell.Text != "None" && cell.Text != "" {
 			job := cell.GetReference().(circleci.Job)
 			updateStepsTree(config, project, job)
 		}
@@ -43,16 +36,16 @@ func updateJobsTable(config config.CirclogConfig, project string, workflow circl
 
 	if len(jobs) != 0 {
 		for row, job := range jobs {
-			var dependencies []string
-			for _, dependsOnJobId := range job.Dependencies {
-				for _, job := range jobs {
-					if dependsOnJobId == job.Id {
-						dependencies = append(dependencies, job.Name)
-					}
-				}
+			dependencies := getNamedJobDependencies(job, jobs)
+			var dependenciesString string
+			if len(dependencies) == 0 {
+				dependenciesString = "[]"
+			} else {
+				// tview has the concept of Regions which use "[string]" as identifiers
+				// to escape these we must add a "[" before the closing "]"
+				dependenciesString = fmt.Sprintf("[%s[]", strings.Join(dependencies, ", "))
 			}
-
-			for column, attr := range []string{job.Name, job.StoppedAt.Sub(job.StartedAt).String(), fmt.Sprintf("%v", dependencies)} {
+			for column, attr := range []string{job.Name, job.StoppedAt.Sub(job.StartedAt).String(), dependenciesString} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(job.Status))
 				cell.SetReference(job)
 				jobsTable.SetCell(row+1, column, cell)
@@ -63,5 +56,32 @@ func updateJobsTable(config config.CirclogConfig, project string, workflow circl
 		jobsTable.SetCell(1, 0, cell)
 	}
 
+	jobsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+			jobsTable.Clear()
+			app.SetFocus(workflowsTable)
+		}
+
+		if event.Rune() == 'd' {
+			app.Stop()
+			fmt.Printf("circlog jobs %s -w %s\n", project, workflow.Id)
+		}
+
+		return event
+	})
+
 	app.SetFocus(jobsTable)
+}
+
+func getNamedJobDependencies(job circleci.Job, jobs []circleci.Job) []string {
+	var namedDependencies []string
+	for _, dependsOnJobId := range job.Dependencies {
+		for _, requiredJob := range jobs {
+			if requiredJob.Id == dependsOnJobId {
+				namedDependencies = append(namedDependencies, requiredJob.Name)
+			}
+		}
+	}
+
+	return namedDependencies
 }

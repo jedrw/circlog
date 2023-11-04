@@ -24,11 +24,11 @@ var (
 		"pending":       tcell.ColorYellowGreen,
 	}
 
-	controlBindings = `
-		Move	           [Up/Down]
+	controlBindings = `Move	           [Up/Down]
 		Select               [Enter]
+		Dump Command             [D]
 		Back         [Esc/Backspace]
-		Quit                [Ctrl+C]
+		Quit              [Q/Ctrl+C]
 	`
 )
 

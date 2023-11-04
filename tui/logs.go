@@ -23,7 +23,6 @@ func updateLogsView(config config.CirclogConfig, project string, job circleci.Jo
 	logsView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
 			logsView.Clear()
-			controls.SetText(controlBindings)
 			app.SetFocus(stepsTree)
 		}
 
@@ -34,8 +33,6 @@ func updateLogsView(config config.CirclogConfig, project string, job circleci.Jo
 
 		return event
 	})
-
-	controls.SetText(controlBindings + "Dump Logs Command        [D]")
 
 	app.SetFocus(logsview)
 }

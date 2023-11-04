@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
@@ -13,14 +14,6 @@ func newStepsTree() *tview.TreeView {
 	stepsTree := tview.NewTreeView()
 	stepsTree.SetTitle(" STEPS ").SetBorder(true)
 
-	stepsTree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
-			stepsTree.GetRoot().ClearChildren()
-			app.SetFocus(jobsTable)
-		}
-		return event
-	})
-
 	return stepsTree
 }
 
@@ -29,7 +22,7 @@ func updateStepsTree(config config.CirclogConfig, project string, job circleci.J
 
 	stepsTree.SetRoot(jobNode).
 		SetCurrentNode(jobNode).
-		SetGraphics((false)).
+		SetGraphics(true).
 		SetTopLevel(1)
 
 	stepsTree.SetSelectedFunc(func(node *tview.TreeNode) {
@@ -48,12 +41,12 @@ func updateStepsTree(config config.CirclogConfig, project string, job circleci.J
 			for _, action := range step.Actions {
 				var actionDuration string
 				if i == len(steps.Steps)-1 {
-					actionDuration = job.StoppedAt.Sub(action.StartTime).String()
+					actionDuration = job.StoppedAt.Sub(action.StartTime).Round(time.Millisecond).String()
 				} else {
-					actionDuration = steps.Steps[i+1].Actions[0].StartTime.Sub(action.StartTime).String()
+					actionDuration = steps.Steps[i+1].Actions[0].StartTime.Sub(action.StartTime).Round(time.Millisecond).String()
 				}
 
-				actionNode := tview.NewTreeNode(fmt.Sprintf("%d (%s)", action.Index, actionDuration)).
+				actionNode := tview.NewTreeNode(fmt.Sprintf(" %d (%s)", action.Index, actionDuration)).
 					SetSelectable(true).
 					SetReference(action).
 					SetColor(colourByStatus[action.Status])
@@ -64,6 +57,20 @@ func updateStepsTree(config config.CirclogConfig, project string, job circleci.J
 		noneNode := tview.NewTreeNode("None").SetSelectable(false)
 		jobNode.AddChild(noneNode)
 	}
+
+	stepsTree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+			stepsTree.GetRoot().ClearChildren()
+			app.SetFocus(jobsTable)
+		}
+
+		if event.Rune() == 'd' {
+			app.Stop()
+			fmt.Printf("circlog steps %s -j %d\n", project, job.JobNumber)
+		}
+
+		return event
+	})
 
 	app.SetFocus(stepsTree)
 }

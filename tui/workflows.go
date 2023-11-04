@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
 	"github.com/lupinelab/circlog/config"
@@ -8,20 +10,12 @@ import (
 )
 
 func newWorkflowsTable(config config.CirclogConfig, project string) *tview.Table {
-	workflowsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0)
+	workflowsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 	workflowsTable.SetTitle(" WORKFLOWS ").SetBorder(true)
-
-	workflowsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
-			workflowsTable.Clear()
-			app.SetFocus(pipelinesTable)
-		}
-		return event
-	})
 
 	workflowsTable.SetSelectedFunc(func(row int, col int) {
 		cell := workflowsTable.GetCell(row, 0)
-		if cell.Text != "None" {
+		if cell.Text != "None" && cell.Text != "" {
 			workflow := cell.GetReference().(circleci.Workflow)
 			updateJobsTable(config, project, workflow, jobsTable)
 		}
@@ -51,6 +45,20 @@ func updateWorkflowsTable(config config.CirclogConfig, project string, pipeline 
 		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
 		workflowsTable.SetCell(1, 0, cell)
 	}
+
+	workflowsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+			workflowsTable.Clear()
+			app.SetFocus(pipelinesTable)
+		}
+
+		if event.Rune() == 'd' {
+			app.Stop()
+			fmt.Printf("circlog workflows %s -l %s\n", project, pipeline.Id)
+		}
+
+		return event
+	})
 
 	app.SetFocus(workflowsTable)
 }
