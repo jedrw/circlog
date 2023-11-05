@@ -15,8 +15,8 @@ var VCSV1ToV2 = map[string]string{
 	"gitlab":    "gl",
 }
 
-type circleciCliConfig struct {
-	token string `yaml:"token"`
+type circleCiCliConfig struct {
+	Token string `yaml:"token"`
 }
 
 type circlogState struct {
@@ -38,7 +38,7 @@ func GetToken() (string, bool, error) {
 		return token, true, nil
 	}
 
-	token, exists, err := getTokenFromCliConfig()
+	token, exists, err := getTokenFromCircleCiCliConfig()
 	if err != nil {
 		return "", false, err
 	} else if !exists {
@@ -48,7 +48,7 @@ func GetToken() (string, bool, error) {
 	}
 }
 
-func getTokenFromCliConfig() (string, bool, error) {
+func getTokenFromCircleCiCliConfig() (string, bool, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", false, err
@@ -62,45 +62,65 @@ func getTokenFromCliConfig() (string, bool, error) {
 	_, err = os.Stat(circleciCliConfigPath)
 	if err != nil {
 		return "", false, nil
+	}
+
+	circleciCliConfigBytes, err := os.ReadFile(circleciCliConfigPath)
+	if err != nil {
+		return "", false, err
+	}
+
+	var config circleCiCliConfig
+	err = yaml.Unmarshal(circleciCliConfigBytes, &config)
+	if err != nil {
+		return "", true, fmt.Errorf("could not parse %s", circleciCliConfigPath)
+	} else if config.Token == "" {
+		return "", false, err
 	} else {
-		circleciCliConfigFile, _ := os.ReadFile(circleciCliConfigPath)
-		var config circleciCliConfig
-		err = yaml.Unmarshal(circleciCliConfigFile, &config)
-		if err != nil {
-			return "", true, fmt.Errorf("could not parse %s", circleciCliConfigPath)
-		} else {
-			return config.token, true, nil
-		}
+		return config.Token, true, err
 	}
 }
 
-func ensureConfigDir() error {
+func ensureConfigDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	circlogConfigDir, err := filepath.Abs(fmt.Sprintf("%s/.config/circlog", homeDir))
 	if err != nil {
-		return err
+		return circlogConfigDir, err
 	}
 
-	if _, err = os.Stat(circlogConfigDir); errors.Is(err, os.ErrNotExist) {
-		err := os.MkdirAll(circlogConfigDir, 0755)
+	err = os.MkdirAll(circlogConfigDir, 0755)
+	if err != nil {
+		return circlogConfigDir, err
+	}
+
+	return circlogConfigDir, err
+}
+
+func ensureStateFile() (string, error) {
+	circlogConfigDir, err := ensureConfigDir()
+	if err != nil {
+		return "", err
+	}
+
+	circlogConfigFile, err := filepath.Abs(fmt.Sprintf("%s/config.yaml", circlogConfigDir))
+	if err != nil {
+		return circlogConfigFile, err
+	}
+
+	if _, err = os.Stat(circlogConfigFile); errors.Is(err, os.ErrNotExist) {
+		_, err = os.Create(circlogConfigFile)
 		if err != nil {
-			return err
+			return circlogConfigFile, err
 		}
 	}
 
-	return err
+	return circlogConfigFile, err
 }
 
-func updateState(newState circlogState) error {
-	stateFilePath, err := stateFilePath()
-	if err != nil {
-		return err
-	}
-
+func updateState(stateFilePath string, newState circlogState) error {
 	configYaml, err := yaml.Marshal(&newState)
 	if err != nil {
 		return err
@@ -109,30 +129,17 @@ func updateState(newState circlogState) error {
 	return os.WriteFile(stateFilePath, configYaml, 0644)
 }
 
-func stateFilePath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	stateFilePath, err := filepath.Abs(fmt.Sprintf("%s/.config/circlog/config.yaml", homeDir))
-	if err != nil {
-		return "", err
-	}
-
-	return stateFilePath, err
-}
-
 func readConfigFromState(stateFilePath string) (CirclogConfig, error) {
 	var config CirclogConfig
 
 	b, err := os.ReadFile(stateFilePath)
+	if err != nil {
+		return CirclogConfig{}, err
+	}
 
-	if err == nil {
-		err = yaml.Unmarshal(b, &config)
-		if err != nil {
-			return CirclogConfig{}, fmt.Errorf("could not parse %s", stateFilePath)
-		}
+	err = yaml.Unmarshal(b, &config)
+	if err != nil {
+		return CirclogConfig{}, fmt.Errorf("could not parse %s", stateFilePath)
 	}
 
 	return config, err
@@ -155,42 +162,47 @@ func updateConfig(config *CirclogConfig, vcs string, org string) error {
 }
 
 func NewConfig(project string, vcs string, org string, branch string) (CirclogConfig, error) {
-	err := ensureConfigDir()
+	circlogStateFile, err := ensureStateFile()
 	if err != nil {
 		return CirclogConfig{}, err
 	}
 
-	stateFilePath, err := stateFilePath()
+	config, err := readConfigFromState(circlogStateFile)
 	if err != nil {
-		return CirclogConfig{}, err
+		return config, err
 	}
 
-	config, err := readConfigFromState(stateFilePath)
-	if err != nil {
-		return CirclogConfig{}, err
+	if vcs != "" || org != "" {
+		err := updateConfig(&config, vcs, org)
+		if err != nil {
+			return config, err
+		}
+
+		err = updateState(circlogStateFile, circlogState{
+			Organisation: config.Org,
+			Vcs:          config.Vcs,
+		})
+		if err != nil {
+			return config, err
+		}
 	}
 
-	err = updateConfig(&config, vcs, org)
-	if err != nil {
-		return CirclogConfig{}, err
+	if config.Org == "" {
+		return config, fmt.Errorf("organisation is not set")
 	}
 
-	err = updateState(circlogState{
-		Organisation: config.Org,
-		Vcs:          config.Vcs,
-	})
-	if err != nil {
-		return CirclogConfig{}, err
+	if config.Vcs == "" {
+		return config, fmt.Errorf("vcs is not set")
 	}
 
 	token, exists, err := GetToken()
 	if err != nil {
-		return CirclogConfig{}, err
+		return config, err
 	} else if !exists {
-		return CirclogConfig{}, errors.New("could not find token in either 'CIRCLECI_TOKEN' env var or CircleCi Cli config.yml")
+		return config, errors.New("could not find token in either 'CIRCLECI_TOKEN' env var or CircleCi Cli cli.yml")
 	}
 
-	config.Project= project
+	config.Project = project
 	config.Token = token
 	config.Branch = branch
 
