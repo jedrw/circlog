@@ -50,13 +50,13 @@ type JobDetails struct {
 	Steps []Step `json:"steps"`
 }
 
-func GetWorkflowJobs(config config.CirclogConfig, workflowId string) ([]Job, error) {
+func GetWorkflowJobs(config config.CirclogConfig, workflowId string, numPages int, nextPageToken string) ([]Job, string, error) {
 	url := fmt.Sprintf("%s/workflow/%s/job", CIRCLECI_ENDPOINT_V2, workflowId)
 
-	jobs, err := collectPaginatedResponses[Job](url, config)
+	jobs, nextPageToken, err := MakeRequest[Job](url, config, numPages, nextPageToken)
 	if err != nil {
-		return []Job{}, err
+		return []Job{}, nextPageToken, err
 	}
 
-	return jobs, err
+	return jobs, nextPageToken, err
 }

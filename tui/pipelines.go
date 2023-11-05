@@ -28,35 +28,54 @@ func newPipelinesTable(config config.CirclogConfig, project string) *tview.Table
 	})
 
 	pipelinesTable.Select(1, 1)
-	pipelinesTable.SetSelectedFunc(func(row int, col int) {
-		cell := pipelinesTable.GetCell(row, 0)
-		if cell.Text != "None" && cell.Text != "" {
-			pipeline := cell.GetReference().(circleci.Pipeline)
-			updateWorkflowsTable(config, project, pipeline, workflowsTable)
-		}
-	})
 
 	return pipelinesTable
 }
 
 func updatePipelinesTable(config config.CirclogConfig, project string, pipelinesTable *tview.Table) {
-	pipelines, _ := circleci.GetProjectPipelines(config)
+	pipelines, nextPageToken, _ := circleci.GetProjectPipelines(config, 1, "")
 
-	if len(pipelines) != 0 {
-		for row, pipeline := range pipelines {
-			for column, attr := range []string{fmt.Sprint(pipeline.Number), branchOrTag(pipeline), pipeline.CreatedAt.Local().Format(time.RFC822Z), pipeline.Trigger.Type} {
-				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(pipeline.State))
-				cell.SetReference(pipeline)
-				pipelinesTable.SetCell(row+1, column, cell)
+	addPipelinesToTable(pipelines, pipelinesTable.GetRowCount(), nextPageToken)
+
+	pipelinesTable.SetSelectedFunc(func(row int, col int) {
+		cell := pipelinesTable.GetCell(row, 0)
+		cellRef := cell.GetReference()
+		switch cellRef := cellRef.(type) {
+		case circleci.Pipeline:
+			updateWorkflowsTable(config, project, cellRef)
+		case string:
+			if cell.Text == "Next page..." {
+				nextPageToken := cell.GetReference().(string)
+				newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(config, 1, nextPageToken)
+				addPipelinesToTable(newPipelines, pipelinesTable.GetRowCount()-1, nextPageToken)
 			}
 		}
-	} else {
-		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
-		pipelinesTable.SetCell(1, 0, cell)
-	}
+	})
 
 	pipelinesTable.ScrollToBeginning().Select(0, 0)
 
 	// This function is called as a go routine so we must tell the application focus and draw once done.
 	app.SetFocus(pipelinesTable).Draw()
+}
+
+func addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {
+	if len(pipelines) != 0 {
+		for row, pipeline := range pipelines {
+			for column, attr := range []string{fmt.Sprint(pipeline.Number), branchOrTag(pipeline), pipeline.CreatedAt.Local().Format(time.RFC822Z), pipeline.Trigger.Type} {
+				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(pipeline.State))
+				cell.SetReference(pipeline)
+				pipelinesTable.SetCell(row+startRow, column, cell)
+			}
+		}
+
+		if nextPageToken != "" {
+			cell := tview.NewTableCell("Next page...")
+			cell.SetReference(nextPageToken)
+			pipelinesTable.SetCell(pipelinesTable.GetRowCount(), 0, cell)
+		}
+
+	} else {
+		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
+		pipelinesTable.SetCell(1, 0, cell)
+	}
 }

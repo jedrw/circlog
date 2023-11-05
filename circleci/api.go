@@ -39,10 +39,6 @@ type ApiResponse[T ResponseType] struct {
 	Items         []T    `json:"items"`
 }
 
-func New[T ResponseType](object T) *ApiResponse[T] {
-	return &ApiResponse[T]{}
-}
-
 func parseResponseBody[T ResponseType](responseBody []byte) (*ApiResponse[T], error) {
 	parsedApiResponse := new(ApiResponse[T])
 	err := json.Unmarshal(responseBody, &parsedApiResponse)
@@ -50,13 +46,17 @@ func parseResponseBody[T ResponseType](responseBody []byte) (*ApiResponse[T], er
 	return parsedApiResponse, err
 }
 
-func collectPaginatedResponses[T ResponseType](url string, config config.CirclogConfig) ([]T, error) {
+func MakeRequest[T ResponseType](url string, config config.CirclogConfig, numPages int, nextPageToken string) ([]T, string, error) {
 	items := []T{}
-	var nextPageToken string
 	var branch string
 	newItems := true
+	page := 0
 
-	for newItems {
+	for newItems && page != numPages {
+		if nextPageToken != "" {
+			nextPageToken = fmt.Sprintf("?page-token=%s", nextPageToken)
+		}
+
 		if nextPageToken != "" && config.Branch != "" {
 			branch = fmt.Sprintf("&branch=%s", config.Branch)
 		} else if config.Branch != "" {
@@ -67,14 +67,14 @@ func collectPaginatedResponses[T ResponseType](url string, config config.Circlog
 
 		req, err := http.NewRequest("GET", endpoint, nil)
 		if err != nil {
-			return items, err
+			return items, "", err
 		}
 
 		req.Header.Add("Circle-Token", config.Token)
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return items, err
+			return items, "", err
 		}
 
 		defer res.Body.Close()
@@ -82,18 +82,18 @@ func collectPaginatedResponses[T ResponseType](url string, config config.Circlog
 
 		parsedResponse, err := parseResponseBody[T](body)
 		if err != nil {
-			return items, err
+			return items, "", err
 		}
 
 		items = append(items, parsedResponse.Items...)
 
-		if parsedResponse.NextPageToken != "" {
-			nextPageToken = fmt.Sprintf("?page-token=%s", parsedResponse.NextPageToken)
-		} else {
+		nextPageToken = parsedResponse.NextPageToken
+		if nextPageToken == "" {
 			newItems = false
 		}
 
+		page++
 	}
 
-	return items, nil
+	return items, nextPageToken, nil
 }

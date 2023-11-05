@@ -17,6 +17,7 @@ var workflowsCmd = &cobra.Command{
 		vcs, _ := cmd.Flags().GetString("vcs")
 		org, _ := cmd.Flags().GetString("org")
 		branch, _ := cmd.Flags().GetString("branch")
+		numPages, _ := cmd.Flags().GetInt("number-pages")
 
 		pipelineId, _ := cmd.Flags().GetString("pipeline-id")
 
@@ -26,7 +27,7 @@ var workflowsCmd = &cobra.Command{
 			return
 		}
 
-		pipelineWorkflows, err := circleci.GetPipelineWorkflows(config, project, pipelineId)
+		pipelineWorkflows, _, err := circleci.GetPipelineWorkflows(config, project, pipelineId, numPages, "")
 		if err != nil {
 			fmt.Println(err.Error())
 		}

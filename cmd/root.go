@@ -39,6 +39,7 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringP("vcs", "v", "", "Version Control System")
 	rootCmd.PersistentFlags().StringP("org", "o", "", "Organisation")
+	rootCmd.PersistentFlags().IntP("number-pages", "n", 1, "Number of pages to return, -1 to return eveyrthing (note that this may take a long time if the project has many pipelines)")
 	rootCmd.Flags().StringP("branch", "b", "", "Branch")
 
 	rootCmd.AddCommand(pipelinesCmd)

@@ -22,13 +22,13 @@ type Workflow struct {
 	StoppedAt      time.Time `json:"stopped_at"`
 }
 
-func GetPipelineWorkflows(config config.CirclogConfig, project string, pipelineId string) ([]Workflow, error) {
+func GetPipelineWorkflows(config config.CirclogConfig, project string, pipelineId string, numPages int, nextPageToken string) ([]Workflow, string, error) {
 	url := fmt.Sprintf("%s/pipeline/%s/workflow", CIRCLECI_ENDPOINT_V2, pipelineId)
 
-	workflows, err := collectPaginatedResponses[Workflow](url, config)
+	workflows, nextPageToken, err := MakeRequest[Workflow](url, config, numPages, nextPageToken)
 	if err != nil {
-		return []Workflow{}, err
+		return []Workflow{}, nextPageToken, err
 	}
 
-	return workflows, err
+	return workflows, nextPageToken, err
 }

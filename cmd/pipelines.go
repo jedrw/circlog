@@ -17,6 +17,7 @@ var pipelinesCmd = &cobra.Command{
 		vcs, _ := cmd.Flags().GetString("vcs")
 		org, _ := cmd.Flags().GetString("org")
 		branch, _ := cmd.Flags().GetString("branch")
+		numPages, _ := cmd.Flags().GetInt("number-pages")
 
 		config, err := config.NewConfig(project, vcs, org, branch)
 		if err != nil {
@@ -24,7 +25,7 @@ var pipelinesCmd = &cobra.Command{
 			return
 		}
 
-		projectPipelines, err := circleci.GetProjectPipelines(config)
+		projectPipelines, _, err := circleci.GetProjectPipelines(config, numPages, "")
 		if err != nil {
 			fmt.Println(err.Error())
 		}

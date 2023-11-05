@@ -57,13 +57,13 @@ type Pipeline struct {
 	Vcs               Vcs                       `json:"vcs"`
 }
 
-func GetProjectPipelines(config config.CirclogConfig) ([]Pipeline, error) {
+func GetProjectPipelines(config config.CirclogConfig, numPages int, nextPageToken string) ([]Pipeline, string, error) {
 	url := fmt.Sprintf("%s/project/%s/pipeline", CIRCLECI_ENDPOINT_V2, config.ProjectSlugV2())
 
-	pipelines, err := collectPaginatedResponses[Pipeline](url, config)
+	pipelines, nextPageToken, err := MakeRequest[Pipeline](url, config, numPages, nextPageToken)
 	if err != nil {
-		return []Pipeline{}, err
+		return []Pipeline{}, nextPageToken, err
 	}
 
-	return pipelines, err
+	return pipelines, nextPageToken, err
 }
