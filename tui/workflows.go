@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
@@ -62,7 +63,14 @@ func updateWorkflowsTable(config config.CirclogConfig, project string, pipeline 
 func addWorkflowsToTable(workflows []circleci.Workflow, startRow int, nextPageToken string) {
 	if len(workflows) != 0 {
 		for row, workflow := range workflows {
-			for column, attr := range []string{workflow.Name, workflow.StoppedAt.Sub(workflow.CreatedAt).String()} {
+			var workflowDuration string
+			if workflow.Status == circleci.RUNNING {
+				workflowDuration = time.Since(workflow.CreatedAt).Round(time.Millisecond).String()
+			} else {
+				workflowDuration = workflow.StoppedAt.Sub(workflow.CreatedAt).Round(time.Millisecond).String()
+			}
+
+			for column, attr := range []string{workflow.Name, workflowDuration} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(workflow.Status))
 				cell.SetReference(workflow)
 				workflowsTable.SetCell(row+1, column, cell)
