@@ -37,9 +37,6 @@ jobs:
       GOOS:
         type: string
     steps: 
-      - run:
-          name: Install upx
-          command: sudo apt update && sudo apt install upx -y
       - checkout
       - restore_cache:
           keys:
@@ -55,9 +52,6 @@ jobs:
       - run: 
           name: Build
           command: GOARCH=<< parameters.GOARCH >> GOOS=<< parameters.GOOS >> go build -o ./${CIRCLE_PROJECT_REPONAME} -v -ldflags="-w -s"
-      - run:
-          name: Upx
-          command: upx ./${CIRCLE_PROJECT_REPONAME}
       - run:
           name: Package
           command: mkdir ./build && tar cvfz ./build/${CIRCLE_PROJECT_REPONAME}_${CIRCLE_TAG}_<< parameters.GOOS >>_<< parameters.GOARCH >>.tar.gz ./${CIRCLE_PROJECT_REPONAME}
