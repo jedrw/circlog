@@ -16,7 +16,7 @@ const (
 
 	// Status types
 	SUCCESS      = "success"
-	RUNING       = "running"
+	RUNNING      = "running"
 	NOT_RUN      = "not_run"
 	FAILED       = "failed"
 	ERROR        = "error"

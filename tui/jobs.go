@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
@@ -72,7 +73,15 @@ func addJobsToTable(jobs []circleci.Job, startRow int, nextPageToken string) {
 				// to escape these we must add a "[" before the closing "]"
 				dependenciesString = fmt.Sprintf("[%s[]", strings.Join(dependencies, ", "))
 			}
-			for column, attr := range []string{job.Name, job.StoppedAt.Sub(job.StartedAt).String(), dependenciesString} {
+
+			var jobDuration string
+			if job.Status == circleci.RUNNING {
+				jobDuration = time.Since(job.StartedAt).Round(time.Millisecond).String()
+			} else {
+				jobDuration = job.StoppedAt.Sub(job.StartedAt).Round(time.Millisecond).String()
+			}
+
+			for column, attr := range []string{job.Name, jobDuration, dependenciesString} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(job.Status))
 				cell.SetReference(job)
 				jobsTable.SetCell(row+startRow, column, cell)

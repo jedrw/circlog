@@ -40,16 +40,21 @@ func updateStepsTree(config config.CirclogConfig, project string, job circleci.J
 			jobNode.AddChild(stepNode)
 			for _, action := range step.Actions {
 				var actionDuration string
-				if i == len(steps.Steps)-1 {
-					actionDuration = job.StoppedAt.Sub(action.StartTime).Round(time.Millisecond).String()
+				if action.Status == circleci.RUNNING {
+					actionDuration = time.Since(action.StartTime).Round(time.Millisecond).String()
 				} else {
-					actionDuration = steps.Steps[i+1].Actions[0].StartTime.Sub(action.StartTime).Round(time.Millisecond).String()
+					if i == len(steps.Steps)-1 {
+						actionDuration = job.StoppedAt.Sub(action.StartTime).Round(time.Millisecond).String()
+					} else {
+						actionDuration = steps.Steps[i+1].Actions[0].StartTime.Sub(action.StartTime).Round(time.Millisecond).String()
+					}
 				}
 
 				actionNode := tview.NewTreeNode(fmt.Sprintf(" %d (%s)", action.Index, actionDuration)).
 					SetSelectable(true).
 					SetReference(action).
 					SetColor(colourByStatus[action.Status])
+				
 				stepNode.AddChild(actionNode)
 			}
 		}
