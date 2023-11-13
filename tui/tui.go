@@ -31,7 +31,7 @@ func Run(config config.CirclogConfig, project string) {
 		branch = "ALL"
 	}
 
-	info := tview.NewTextView().SetText(fmt.Sprintf("Project: %s\nBranch: %s\nOrganisation: %s", config.Org, project, branch))
+	info := tview.NewTextView().SetText(fmt.Sprintf("Project: %s\nBranch: %s\nOrganisation: %s", project, branch, config.Org))
 	heading.AddItem(info, 0, 1, false)
 
 	controls = tview.NewTextView().SetTextAlign(tview.AlignRight)
