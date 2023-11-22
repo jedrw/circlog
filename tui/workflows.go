@@ -10,15 +10,15 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newWorkflowsTable(config config.CirclogConfig, project string) *tview.Table {
+func newWorkflowsTable(config config.CirclogConfig) *tview.Table {
 	workflowsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 	workflowsTable.SetTitle(" WORKFLOWS ").SetBorder(true)
 
 	return workflowsTable
 }
 
-func updateWorkflowsTable(config config.CirclogConfig, project string, pipeline circleci.Pipeline) {
-	workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(config, project, pipeline.Id, 1, "")
+func updateWorkflowsTable(config config.CirclogConfig, pipeline circleci.Pipeline) {
+	workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(config, pipeline.Id, 1, "")
 
 	workflowsTable.Clear()
 
@@ -29,14 +29,14 @@ func updateWorkflowsTable(config config.CirclogConfig, project string, pipeline 
 	addWorkflowsToTable(workflows, workflowsTable.GetRowCount(), nextPageToken)
 
 	workflowsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+		if event.Key() == tcell.KeyEsc {
 			workflowsTable.Clear()
 			app.SetFocus(pipelinesTable)
 		}
 
 		if event.Rune() == 'd' {
 			app.Stop()
-			fmt.Printf("circlog workflows %s -l %s\n", project, pipeline.Id)
+			fmt.Printf("circlog workflows %s -l %s\n", config.Project, pipeline.Id)
 		}
 
 		return event
@@ -47,11 +47,11 @@ func updateWorkflowsTable(config config.CirclogConfig, project string, pipeline 
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
 		case circleci.Workflow:
-			updateJobsTable(config, project, cellRef, jobsTable)
+			updateJobsTable(config, config.Project, cellRef, jobsTable)
 		case string:
 			if cell.Text == "Next page..." {
 				nextPageToken := cell.GetReference().(string)
-				newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(config, project, pipeline.Id, 1, nextPageToken)
+				newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(config, pipeline.Id, 1, nextPageToken)
 				addWorkflowsToTable(newWorkflows, workflowsTable.GetRowCount(), nextPageToken)
 			}
 		}

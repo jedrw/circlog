@@ -27,7 +27,7 @@ var workflowsCmd = &cobra.Command{
 			return
 		}
 
-		pipelineWorkflows, _, err := circleci.GetPipelineWorkflows(config, project, pipelineId, numPages, "")
+		pipelineWorkflows, _, err := circleci.GetPipelineWorkflows(config, pipelineId, numPages, "")
 		if err != nil {
 			fmt.Println(err.Error())
 		}
