@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 
-	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
@@ -32,7 +31,7 @@ func Run(config config.CirclogConfig) {
 	}
 
 	info := tview.NewFlex().SetDirection(tview.FlexRow)
-	heading.AddItem(info, 0, 1, true)
+	heading.AddItem(info, 0, 1, false)
 
 	projectSelect := newProjectSelect(&config)
 	info.AddItem(projectSelect, 1, 1, true)
@@ -64,20 +63,16 @@ func Run(config config.CirclogConfig) {
 	lowerNav.AddItem(stepsTree, 0, 1, false)
 	lowerNav.AddItem(logsView, 0, 2, false)
 
-	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Rune() == 'q' {
-			app.Stop()
-		}
-		return event
-	})
-
 	if config.Project != "" {
-		// enables the TUI to be drawn while waiting for the pipelines to be returned from CircleCi.
-		go updatePipelinesTable(config, pipelinesTable)
-	}
-
-	err := app.SetRoot(layout, true).SetFocus(info).Run()
-	if err != nil {
-		panic(err)
+		updatePipelinesTable(config, pipelinesTable)
+		err := app.SetRoot(layout, true).SetFocus(pipelinesTable).Run()
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		err := app.SetRoot(layout, true).SetFocus(info).Run()
+		if err != nil {
+			panic(err)
+		}
 	}
 }

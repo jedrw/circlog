@@ -58,7 +58,6 @@ func updatePipelinesTable(config config.CirclogConfig, pipelinesTable *tview.Tab
 
 	pipelinesTable.ScrollToBeginning().Select(0, 0)
 
-	// This function is called as a go routine so we must tell the application focus and draw once done.
 	app.SetFocus(pipelinesTable)
 }
 

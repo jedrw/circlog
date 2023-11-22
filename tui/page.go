@@ -27,8 +27,7 @@ var (
 	controlBindings = `Move	           [Up/Down]
 		Select               [Enter]
 		Dump Command             [D]
-		Back                   [Esc]
-		Quit              [Q/Ctrl+C]
+		Back/Quit              [Esc]
 	`
 )
 
