@@ -10,7 +10,7 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newPipelinesTable(config config.CirclogConfig, project string) *tview.Table {
+func newPipelinesTable(config config.CirclogConfig) *tview.Table {
 	pipelinesTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 	pipelinesTable.SetTitle(" PIPELINES ").SetBorder(true)
 
@@ -18,21 +18,10 @@ func newPipelinesTable(config config.CirclogConfig, project string) *tview.Table
 		pipelinesTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
 	}
 
-	pipelinesTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Rune() == 'd' {
-			app.Stop()
-			fmt.Printf("circlog pipelines %s\n", project)
-		}
-
-		return event
-	})
-
-	pipelinesTable.Select(1, 1)
-
 	return pipelinesTable
 }
 
-func updatePipelinesTable(config config.CirclogConfig, project string, pipelinesTable *tview.Table) {
+func updatePipelinesTable(config config.CirclogConfig, pipelinesTable *tview.Table) {
 	pipelines, nextPageToken, _ := circleci.GetProjectPipelines(config, 1, "")
 
 	addPipelinesToTable(pipelines, pipelinesTable.GetRowCount(), nextPageToken)
@@ -42,7 +31,7 @@ func updatePipelinesTable(config config.CirclogConfig, project string, pipelines
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
 		case circleci.Pipeline:
-			updateWorkflowsTable(config, project, cellRef)
+			updateWorkflowsTable(config, cellRef)
 		case string:
 			if cell.Text == "Next page..." {
 				nextPageToken := cell.GetReference().(string)
@@ -52,10 +41,25 @@ func updatePipelinesTable(config config.CirclogConfig, project string, pipelines
 		}
 	})
 
+	pipelinesTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc {
+			app.Stop()
+			config.Project = ""
+			Run(config)
+		}
+		
+		if event.Rune() == 'd' {
+			app.Stop()
+			fmt.Printf("circlog pipelines %s\n", config.Project)
+		}
+
+		return event
+	})
+
 	pipelinesTable.ScrollToBeginning().Select(0, 0)
 
 	// This function is called as a go routine so we must tell the application focus and draw once done.
-	app.SetFocus(pipelinesTable).Draw()
+	app.SetFocus(pipelinesTable)
 }
 
 func addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {

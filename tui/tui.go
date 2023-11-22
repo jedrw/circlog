@@ -18,7 +18,7 @@ var (
 	pipelinesTable *tview.Table
 )
 
-func Run(config config.CirclogConfig, project string) {
+func Run(config config.CirclogConfig) {
 	app = tview.NewApplication()
 
 	layout := tview.NewFlex().SetDirection(tview.FlexRow)
@@ -31,8 +31,14 @@ func Run(config config.CirclogConfig, project string) {
 		branch = "ALL"
 	}
 
-	info := tview.NewTextView().SetText(fmt.Sprintf("Project: %s\nBranch: %s\nOrganisation: %s", project, branch, config.Org))
-	heading.AddItem(info, 0, 1, false)
+	info := tview.NewFlex().SetDirection(tview.FlexRow)
+	heading.AddItem(info, 0, 1, true)
+
+	projectSelect := newProjectSelect(&config)
+	info.AddItem(projectSelect, 1, 1, true)
+	
+	configText := tview.NewTextView().SetText(fmt.Sprintf("Branch: %s\nOrganisation: %s", branch, config.Org))
+	info.AddItem(configText, 0, 1, false)
 
 	controls = tview.NewTextView().SetTextAlign(tview.AlignRight)
 	controls.SetText(controlBindings)
@@ -48,11 +54,11 @@ func Run(config config.CirclogConfig, project string) {
 
 	logsView = newLogsView()
 	stepsTree = newStepsTree()
-	jobsTable = newJobsTable(config, project)
-	workflowsTable = newWorkflowsTable(config, project)
-	pipelinesTable = newPipelinesTable(config, project)
+	jobsTable = newJobsTable(config)
+	workflowsTable = newWorkflowsTable(config)
+	pipelinesTable = newPipelinesTable(config)
 
-	upperNav.AddItem(pipelinesTable, 0, 1, true)
+	upperNav.AddItem(pipelinesTable, 0, 1, false)
 	upperNav.AddItem(workflowsTable, 0, 1, false)
 	upperNav.AddItem(jobsTable, 0, 1, false)
 	lowerNav.AddItem(stepsTree, 0, 1, false)
@@ -65,10 +71,12 @@ func Run(config config.CirclogConfig, project string) {
 		return event
 	})
 
-	// enables the TUI to be drawn while waiting for the pipelines to be returned from CircleCi.
-	go updatePipelinesTable(config, project, pipelinesTable)
+	if config.Project != "" {
+		// enables the TUI to be drawn while waiting for the pipelines to be returned from CircleCi.
+		go updatePipelinesTable(config, pipelinesTable)
+	}
 
-	err := app.SetRoot(layout, true).Run()
+	err := app.SetRoot(layout, true).SetFocus(info).Run()
 	if err != nil {
 		panic(err)
 	}

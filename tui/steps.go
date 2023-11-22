@@ -17,7 +17,7 @@ func newStepsTree() *tview.TreeView {
 	return stepsTree
 }
 
-func updateStepsTree(config config.CirclogConfig, project string, job circleci.Job) {
+func updateStepsTree(config config.CirclogConfig, job circleci.Job) {
 	jobNode := tview.NewTreeNode(job.Name)
 
 	stepsTree.SetRoot(jobNode).
@@ -27,7 +27,7 @@ func updateStepsTree(config config.CirclogConfig, project string, job circleci.J
 
 	stepsTree.SetSelectedFunc(func(node *tview.TreeNode) {
 		action := node.GetReference().(circleci.Action)
-		updateLogsView(config, project, job, action, logsView)
+		updateLogsView(config, job, action, logsView)
 	})
 
 	steps, _ := circleci.GetJobSteps(config, job.JobNumber)
@@ -64,14 +64,14 @@ func updateStepsTree(config config.CirclogConfig, project string, job circleci.J
 	}
 
 	stepsTree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+		if event.Key() == tcell.KeyEsc {
 			stepsTree.GetRoot().ClearChildren()
 			app.SetFocus(jobsTable)
 		}
 
 		if event.Rune() == 'd' {
 			app.Stop()
-			fmt.Printf("circlog steps %s -j %d\n", project, job.JobNumber)
+			fmt.Printf("circlog steps %s -j %d\n", config.Project, job.JobNumber)
 		}
 
 		return event

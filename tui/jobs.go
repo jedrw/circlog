@@ -11,7 +11,7 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newJobsTable(config config.CirclogConfig, project string) *tview.Table {
+func newJobsTable(config config.CirclogConfig) *tview.Table {
 	jobsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 	jobsTable.SetTitle(" JOBS ").SetBorder(true)
 
@@ -30,7 +30,7 @@ func updateJobsTable(config config.CirclogConfig, project string, workflow circl
 	addJobsToTable(jobs, jobsTable.GetRowCount(), nextPageToken)
 
 	jobsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc || event.Key() == tcell.KeyBackspace2 {
+		if event.Key() == tcell.KeyEsc {
 			jobsTable.Clear()
 			app.SetFocus(workflowsTable)
 		}
@@ -48,7 +48,7 @@ func updateJobsTable(config config.CirclogConfig, project string, workflow circl
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
 		case circleci.Job:
-			updateStepsTree(config, project, cellRef)
+			updateStepsTree(config, cellRef)
 		case string:
 			if cell.Text == "Next page..." {
 				nextPageToken := cell.GetReference().(string)
