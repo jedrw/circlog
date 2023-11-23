@@ -21,8 +21,8 @@ func newPipelinesTable(config config.CirclogConfig) *tview.Table {
 	return pipelinesTable
 }
 
-func updatePipelinesTable(config config.CirclogConfig, pipelinesTable *tview.Table) {
-	pipelines, nextPageToken, _ := circleci.GetProjectPipelines(config, 1, "")
+func updatePipelinesTable(config *config.CirclogConfig, pipelinesTable *tview.Table) {
+	pipelines, nextPageToken, _ := circleci.GetProjectPipelines(*config, 1, "")
 
 	addPipelinesToTable(pipelines, pipelinesTable.GetRowCount(), nextPageToken)
 
@@ -31,11 +31,11 @@ func updatePipelinesTable(config config.CirclogConfig, pipelinesTable *tview.Tab
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
 		case circleci.Pipeline:
-			updateWorkflowsTable(config, cellRef)
+			updateWorkflowsTable(*config, cellRef)
 		case string:
-			if cell.Text == "Next page..." {
+			if cell.Text == "..." {
 				nextPageToken := cell.GetReference().(string)
-				newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(config, 1, nextPageToken)
+				newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(*config, 1, nextPageToken)
 				addPipelinesToTable(newPipelines, pipelinesTable.GetRowCount()-1, nextPageToken)
 			}
 		}
@@ -45,9 +45,28 @@ func updatePipelinesTable(config config.CirclogConfig, pipelinesTable *tview.Tab
 		if event.Key() == tcell.KeyEsc {
 			app.Stop()
 			config.Project = ""
-			Run(config)
+			config.Branch = ""
+			Run(*config)
 		}
 		
+		if event.Rune() == 'f' {
+			cell := pipelinesTable.GetCell(pipelinesTable.GetSelection())
+			cellRef := cell.GetReference()
+			switch cellRef := cellRef.(type) {
+			case circleci.Pipeline:
+				if cellRef.Vcs.Branch != "" {
+					config.Branch = cellRef.Vcs.Branch
+					pipelinesTable.Clear()
+					updatePipelinesTable(config, pipelinesTable)
+					branchSelect.SetText(config.Branch)
+				}
+			}
+		}
+
+		if event.Rune() == 'b' {
+			app.SetFocus(branchSelect)
+		}
+
 		if event.Rune() == 'd' {
 			app.Stop()
 			fmt.Printf("circlog pipelines %s\n", config.Project)
@@ -72,7 +91,7 @@ func addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageTo
 		}
 
 		if nextPageToken != "" {
-			cell := tview.NewTableCell("Next page...")
+			cell := tview.NewTableCell("...")
 			cell.SetReference(nextPageToken)
 			pipelinesTable.SetCell(pipelinesTable.GetRowCount(), 0, cell)
 		}

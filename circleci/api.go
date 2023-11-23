@@ -24,10 +24,6 @@ const (
 	ONHOLD       = "on_hold"
 	CANCELED     = "canceled"
 	UNAUTHORIZED = "unauthorized"
-
-	// Job types
-	BUILD    = "build"
-	APPROVAL = "approval"
 )
 
 type ResponseType interface {

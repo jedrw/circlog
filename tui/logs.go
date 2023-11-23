@@ -26,6 +26,10 @@ func updateLogsView(config config.CirclogConfig, job circleci.Job, action circle
 			app.SetFocus(stepsTree)
 		}
 
+		if event.Rune() == 'b' {
+			app.SetFocus(branchSelect)
+		}
+
 		if event.Rune() == 'd' {
 			app.Stop()
 			fmt.Printf("circlog logs %s -j %d -s %d -i %d -a \"%s\"\n", config.Project, job.JobNumber, action.Step, action.Index, action.AllocationId)

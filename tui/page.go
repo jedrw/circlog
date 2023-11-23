@@ -26,7 +26,9 @@ var (
 
 	controlBindings = `Move	           [Up/Down]
 		Select               [Enter]
-		Dump Command             [D]
+		Select branch            [B]
+		Filter by branch         [F]
+		Dump command             [D]
 		Back/Quit              [Esc]
 	`
 )
@@ -42,4 +44,16 @@ func branchOrTag(pipeline circleci.Pipeline) string {
 	}
 
 	return branchOrTag
+}
+
+
+func clearAll() {
+	logsView.Clear()
+	stepNodes := stepsTree.GetRowCount()
+	if stepNodes > 0 {
+		stepsTree.GetRoot().ClearChildren()
+	}
+	jobsTable.Clear()
+	workflowsTable.Clear()
+	pipelinesTable.Clear()
 }

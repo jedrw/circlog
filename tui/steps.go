@@ -69,6 +69,10 @@ func updateStepsTree(config config.CirclogConfig, job circleci.Job) {
 			app.SetFocus(jobsTable)
 		}
 
+		if event.Rune() == 'b' {
+			app.SetFocus(branchSelect)
+		}
+		
 		if event.Rune() == 'd' {
 			app.Stop()
 			fmt.Printf("circlog steps %s -j %d\n", config.Project, job.JobNumber)

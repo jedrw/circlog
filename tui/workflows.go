@@ -34,6 +34,10 @@ func updateWorkflowsTable(config config.CirclogConfig, pipeline circleci.Pipelin
 			app.SetFocus(pipelinesTable)
 		}
 
+		if event.Rune() == 'b' {
+			app.SetFocus(branchSelect)
+		}
+
 		if event.Rune() == 'd' {
 			app.Stop()
 			fmt.Printf("circlog workflows %s -l %s\n", config.Project, pipeline.Id)
@@ -49,7 +53,7 @@ func updateWorkflowsTable(config config.CirclogConfig, pipeline circleci.Pipelin
 		case circleci.Workflow:
 			updateJobsTable(config, config.Project, cellRef, jobsTable)
 		case string:
-			if cell.Text == "Next page..." {
+			if cell.Text == "..." {
 				nextPageToken := cell.GetReference().(string)
 				newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(config, pipeline.Id, 1, nextPageToken)
 				addWorkflowsToTable(newWorkflows, workflowsTable.GetRowCount(), nextPageToken)
@@ -78,7 +82,7 @@ func addWorkflowsToTable(workflows []circleci.Workflow, startRow int, nextPageTo
 		}
 
 		if nextPageToken != "" {
-			cell := tview.NewTableCell("Next page...")
+			cell := tview.NewTableCell("...")
 			cell.SetReference(nextPageToken)
 			workflowsTable.SetCell(workflowsTable.GetRowCount(), 0, cell)
 		}

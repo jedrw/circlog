@@ -12,7 +12,7 @@ func newProjectSelect(config *config.CirclogConfig) *tview.InputField {
 	
 	projectSelect.SetLabel("Project: ").SetDoneFunc(func(key tcell.Key) {
 		config.Project = projectSelect.GetText()
-		updatePipelinesTable(*config, pipelinesTable)
+		updatePipelinesTable(config, pipelinesTable)
 		app.SetFocus(pipelinesTable)
 	})
 

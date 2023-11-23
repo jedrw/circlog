@@ -9,6 +9,7 @@ import (
 
 var (
 	app            *tview.Application
+	branchSelect   *tview.InputField
 	controls       *tview.TextView
 	logsView       *tview.TextView
 	stepsTree      *tview.TreeView
@@ -24,26 +25,23 @@ func Run(config config.CirclogConfig) {
 	layout.SetTitle(" circlog ").SetBorder(true).SetBorderPadding(1, 1, 1, 1)
 
 	heading := tview.NewFlex().SetDirection(tview.FlexColumn)
-
-	branch := config.Branch
-	if config.Branch == "" {
-		branch = "ALL"
-	}
+	layout.AddItem(heading, 6, 0, false)
 
 	info := tview.NewFlex().SetDirection(tview.FlexRow)
 	heading.AddItem(info, 0, 1, false)
 
 	projectSelect := newProjectSelect(&config)
 	info.AddItem(projectSelect, 1, 1, true)
-	
-	configText := tview.NewTextView().SetText(fmt.Sprintf("Branch: %s\nOrganisation: %s", branch, config.Org))
+
+	branchSelect = newBranchSelect(&config)
+	info.AddItem(branchSelect, 1, 1, false)
+
+	configText := tview.NewTextView().SetText(fmt.Sprintf("Organisation: %s", config.Org))
 	info.AddItem(configText, 0, 1, false)
 
 	controls = tview.NewTextView().SetTextAlign(tview.AlignRight)
 	controls.SetText(controlBindings)
 	heading.AddItem(controls, 0, 1, false)
-
-	layout.AddItem(heading, 6, 0, false)
 
 	upperNav := tview.NewFlex().SetDirection(tview.FlexColumn)
 	layout.AddItem(upperNav, 0, 2, false)
@@ -64,7 +62,7 @@ func Run(config config.CirclogConfig) {
 	lowerNav.AddItem(logsView, 0, 2, false)
 
 	if config.Project != "" {
-		updatePipelinesTable(config, pipelinesTable)
+		updatePipelinesTable(&config, pipelinesTable)
 		err := app.SetRoot(layout, true).SetFocus(pipelinesTable).Run()
 		if err != nil {
 			panic(err)
