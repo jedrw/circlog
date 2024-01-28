@@ -2,27 +2,26 @@ package tui
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/lupinelab/circlog/config"
+	"github.com/lupinelab/circlog/circleci"
 	"github.com/rivo/tview"
 )
 
-func newProjectSelect(config *config.CirclogConfig) *tview.InputField {
-	projectSelect := tview.NewInputField().SetText(config.Project).SetFieldWidth(30)
-	projectSelect.SetLabelColor(tcell.ColorDefault)
-	
-	projectSelect.SetLabel("Project: ").SetDoneFunc(func(key tcell.Key) {
-		config.Project = projectSelect.GetText()
-		updatePipelinesTable(config, pipelinesTable)
-		app.SetFocus(pipelinesTable)
+func (cTui *CirclogTui) initProjectSelect() {
+	cTui.projectSelect = tview.NewInputField().SetText(cTui.config.Project).SetFieldWidth(30)
+	cTui.projectSelect.SetLabelColor(tcell.ColorDefault)
+
+	cTui.projectSelect.SetLabel("Project: ").SetDoneFunc(func(key tcell.Key) {
+		cTui.config.Project = cTui.projectSelect.GetText()
+		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
+		cTui.pipelines.populateTable(pipelines, nextPageToken)
+		cTui.app.SetFocus(cTui.pipelines.table)
 	})
 
-	projectSelect.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	cTui.projectSelect.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			app.Stop()
+			cTui.app.Stop()
 		}
-		
+
 		return event
 	})
-
-	return projectSelect
 }

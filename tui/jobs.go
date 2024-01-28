@@ -7,65 +7,73 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
-	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
 
-func newJobsTable(config config.CirclogConfig) *tview.Table {
-	jobsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
-	jobsTable.SetTitle(" JOBS ").SetBorder(true)
-
-	return jobsTable
+type jobsTable struct {
+	table *tview.Table
 }
 
-func updateJobsTable(config config.CirclogConfig, project string, workflow circleci.Workflow, jobsTable *tview.Table) {
-	jobs, nextPageToken, _ := circleci.GetWorkflowJobs(config, workflow.Id, 1, "")
+func (cTui *CirclogTui) newJobsTable() jobsTable {
+	table := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
+	table.SetTitle(" JOBS ").SetBorder(true)
 
-	jobsTable.Clear()
-
-	for column, header := range []string{"Name", "Duration", "Dependencies"} {
-		jobsTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
+	for column, header := range []string{"Name", "Duration", "Depends on"} {
+		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
 	}
 
-	addJobsToTable(jobs, jobsTable.GetRowCount(), nextPageToken)
+	table.SetSelectedFunc(func(row int, col int) {
+		cell := table.GetCell(row, 0)
+		cellRef := cell.GetReference()
+		switch cellRef := cellRef.(type) {
+		case circleci.Job:
+			cTui.tuiState.job = cellRef
+			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.tuiState.job.JobNumber)
+			cTui.steps.populateStepsTree(cTui.tuiState.job, jobDetails)
+			cTui.app.SetFocus(cTui.steps.tree)
+		case string:
+			if cell.Text == "..." {
+				nextPageToken := cell.GetReference().(string)
+				newJobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.tuiState.workflow.Id, 1, nextPageToken)
+				cTui.jobs.addJobsToTable(newJobs, table.GetRowCount()-1, nextPageToken)
+			}
+		}
+	})
 
-	jobsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			jobsTable.Clear()
-			app.SetFocus(workflowsTable)
+			cTui.jobs.clear()
+			cTui.app.SetFocus(cTui.workflows.table)
 		}
 
 		if event.Rune() == 'b' {
-			app.SetFocus(branchSelect)
+			cTui.app.SetFocus(cTui.branchSelect)
 		}
 
 		if event.Rune() == 'd' {
-			app.Stop()
-			fmt.Printf("circlog jobs %s -w %s\n", project, workflow.Id)
+			cTui.app.Stop()
+			fmt.Printf("circlog jobs %s -w %s\n", cTui.config.Project, cTui.tuiState.workflow.Id)
 		}
 
 		return event
 	})
 
-	jobsTable.SetSelectedFunc(func(row int, col int) {
-		cell := jobsTable.GetCell(row, 0)
-		cellRef := cell.GetReference()
-		switch cellRef := cellRef.(type) {
-		case circleci.Job:
-			updateStepsTree(config, cellRef)
-		case string:
-			if cell.Text == "..." {
-				nextPageToken := cell.GetReference().(string)
-				newJobs, nextPageToken, _ := circleci.GetWorkflowJobs(config, workflow.Id, 1, nextPageToken)
-				addJobsToTable(newJobs, jobsTable.GetRowCount()-1, nextPageToken)
-			}
-		}
+	table.SetFocusFunc(func() {
+		cTui.controls.SetText(cTui.controlBindings)
 	})
-
-	app.SetFocus(jobsTable)
+	
+	return jobsTable{
+		table: table,
+	}
 }
 
-func addJobsToTable(jobs []circleci.Job, startRow int, nextPageToken string) {
+func (j jobsTable) populateTable(jobs []circleci.Job, nextPageToken string) {
+	j.clear()
+	j.addJobsToTable(jobs, j.table.GetRowCount(), nextPageToken)
+
+}
+
+func (j jobsTable) addJobsToTable(jobs []circleci.Job, startRow int, nextPageToken string) {
 	if len(jobs) != 0 {
 		for row, job := range jobs {
 			dependencies := getNamedJobDependencies(job, jobs)
@@ -88,19 +96,19 @@ func addJobsToTable(jobs []circleci.Job, startRow int, nextPageToken string) {
 			for column, attr := range []string{job.Name, jobDuration, dependenciesString} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(job.Status))
 				cell.SetReference(job)
-				jobsTable.SetCell(row+startRow, column, cell)
+				j.table.SetCell(row+startRow, column, cell)
 			}
 		}
 
 		if nextPageToken != "" {
 			cell := tview.NewTableCell("...").SetStyle(tcell.StyleDefault)
 			cell.SetReference(nextPageToken)
-			jobsTable.SetCell(jobsTable.GetRowCount(), 0, cell)
+			j.table.SetCell(j.table.GetRowCount(), 0, cell)
 		}
 
 	} else {
 		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
-		jobsTable.SetCell(1, 0, cell)
+		j.table.SetCell(1, 0, cell)
 	}
 }
 
@@ -115,4 +123,11 @@ func getNamedJobDependencies(job circleci.Job, jobs []circleci.Job) []string {
 	}
 
 	return namedDependencies
+}
+
+func (j jobsTable) clear() {
+	row := 1
+	for row < j.table.GetRowCount() {
+		j.table.RemoveRow(row)
+	}
 }

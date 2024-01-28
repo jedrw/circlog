@@ -6,98 +6,121 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
-	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
 
-func newPipelinesTable(config config.CirclogConfig) *tview.Table {
-	pipelinesTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
-	pipelinesTable.SetTitle(" PIPELINES ").SetBorder(true)
-
-	for column, header := range []string{"Number", "Branch/Tag", "Start", "Trigger"} {
-		pipelinesTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
-	}
-
-	return pipelinesTable
+type pipelinesTable struct {
+	table *tview.Table
 }
 
-func updatePipelinesTable(config *config.CirclogConfig, pipelinesTable *tview.Table) {
-	pipelines, nextPageToken, _ := circleci.GetProjectPipelines(*config, 1, "")
+func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
+	table := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
+	table.SetTitle(" PIPELINES ").SetBorder(true)
 
-	addPipelinesToTable(pipelines, pipelinesTable.GetRowCount(), nextPageToken)
+	for column, header := range []string{"Number", "Branch/Tag", "Start", "Trigger"} {
+		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
+	}
 
-	pipelinesTable.SetSelectedFunc(func(row int, col int) {
-		cell := pipelinesTable.GetCell(row, 0)
+	table.SetSelectedFunc(func(row int, col int) {
+		cell := table.GetCell(row, 0)
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
 		case circleci.Pipeline:
-			updateWorkflowsTable(*config, cellRef)
+			cTui.tuiState.pipeline = cellRef
+			workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.tuiState.pipeline.Id, 1, "")
+			cTui.workflows.populateWorkflowsTable(workflows, nextPageToken)
+			cTui.app.SetFocus(cTui.workflows.table)
 		case string:
 			if cell.Text == "..." {
 				nextPageToken := cell.GetReference().(string)
-				newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(*config, 1, nextPageToken)
-				addPipelinesToTable(newPipelines, pipelinesTable.GetRowCount()-1, nextPageToken)
+				newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, nextPageToken)
+				cTui.pipelines.addPipelinesToTable(newPipelines, table.GetRowCount()-1, nextPageToken)
 			}
 		}
 	})
 
-	pipelinesTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			app.Stop()
-			config.Project = ""
-			config.Branch = ""
-			Run(*config)
+			cTui.clearAll()
+			cTui.config.Project = ""
+			cTui.config.Branch = ""
+			cTui.app.SetFocus(cTui.projectSelect)
 		}
-		
+
 		if event.Rune() == 'f' {
-			cell := pipelinesTable.GetCell(pipelinesTable.GetSelection())
+			cell := table.GetCell(table.GetSelection())
 			cellRef := cell.GetReference()
 			switch cellRef := cellRef.(type) {
 			case circleci.Pipeline:
 				if cellRef.Vcs.Branch != "" {
-					config.Branch = cellRef.Vcs.Branch
-					pipelinesTable.Clear()
-					updatePipelinesTable(config, pipelinesTable)
-					branchSelect.SetText(config.Branch)
+					cTui.config.Branch = cellRef.Vcs.Branch
+					pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
+					cTui.pipelines.clear()
+					cTui.pipelines.populateTable(pipelines, nextPageToken)
+					cTui.branchSelect.SetText(cTui.config.Branch)
 				}
 			}
 		}
 
 		if event.Rune() == 'b' {
-			app.SetFocus(branchSelect)
+			cTui.app.SetFocus(cTui.branchSelect)
 		}
 
 		if event.Rune() == 'd' {
-			app.Stop()
-			fmt.Printf("circlog pipelines %s\n", config.Project)
+			cTui.app.Stop()
+			fmt.Printf("circlog pipelines %s\n", cTui.config.Project)
 		}
 
 		return event
 	})
 
-	pipelinesTable.ScrollToBeginning().Select(0, 0)
+	pipelinesControlBindings := `Move	           [Up/Down]
+		Select               [Enter]
+		Select branch            [B]
+		Filter by branch         [F]
+		Dump command             [D]
+		Back/Quit              [Esc]
+	`
 
-	app.SetFocus(pipelinesTable)
+	table.SetFocusFunc(func() {
+		cTui.controls.SetText(pipelinesControlBindings)
+	})
+
+	return pipelinesTable{
+		table: table,
+	}
 }
 
-func addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {
+func (p pipelinesTable) populateTable(pipelines []circleci.Pipeline, nextPageToken string) {
+	p.addPipelinesToTable(pipelines, p.table.GetRowCount(), nextPageToken)
+	p.table.ScrollToBeginning().Select(0, 0)
+}
+
+func (p pipelinesTable) addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {
 	if len(pipelines) != 0 {
 		for row, pipeline := range pipelines {
 			for column, attr := range []string{fmt.Sprint(pipeline.Number), branchOrTag(pipeline), pipeline.CreatedAt.Local().Format(time.RFC822Z), pipeline.Trigger.Type} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(pipeline.State))
 				cell.SetReference(pipeline)
-				pipelinesTable.SetCell(row+startRow, column, cell)
+				p.table.SetCell(row+startRow, column, cell)
 			}
 		}
 
 		if nextPageToken != "" {
 			cell := tview.NewTableCell("...")
 			cell.SetReference(nextPageToken)
-			pipelinesTable.SetCell(pipelinesTable.GetRowCount(), 0, cell)
+			p.table.SetCell(p.table.GetRowCount(), 0, cell)
 		}
 
 	} else {
 		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
-		pipelinesTable.SetCell(1, 0, cell)
+		p.table.SetCell(1, 0, cell)
+	}
+}
+
+func (p pipelinesTable) clear() {
+	row := 1
+	for row < p.table.GetRowCount() {
+		p.table.RemoveRow(row)
 	}
 }

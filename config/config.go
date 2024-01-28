@@ -129,7 +129,7 @@ func updateState(stateFilePath string, newState circlogState) error {
 	return os.WriteFile(stateFilePath, configYaml, 0644)
 }
 
-func readConfigFromState(stateFilePath string) (CirclogConfig, error) {
+func loadConfig(stateFilePath string) (CirclogConfig, error) {
 	var config CirclogConfig
 
 	b, err := os.ReadFile(stateFilePath)
@@ -167,7 +167,7 @@ func NewConfig(project string, vcs string, org string, branch string) (CirclogCo
 		return CirclogConfig{}, err
 	}
 
-	config, err := readConfigFromState(circlogStateFile)
+	config, err := loadConfig(circlogStateFile)
 	if err != nil {
 		return config, err
 	}

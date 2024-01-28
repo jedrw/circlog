@@ -4,39 +4,50 @@ import (
 	"fmt"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/lupinelab/circlog/circleci"
-	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
 
-func newLogsView() *tview.TextView {
-	logsView := tview.NewTextView()
-	logsView.SetTitle(" LOGS ").SetBorder(true).SetBorderPadding(0, 0, 1, 1)
-
-	return logsView
+type logsView struct {
+	view *tview.TextView
 }
 
-func updateLogsView(config config.CirclogConfig, job circleci.Job, action circleci.Action, logsview *tview.TextView) {
-	logs, _ := circleci.GetStepLogs(config, job.JobNumber, action.Step, action.Index, action.AllocationId)
-	logsview.SetText(logs).ScrollToBeginning()
+func (cTui *CirclogTui) newLogsView() logsView {
+	view := tview.NewTextView()
+	view.SetTitle(" LOGS ").SetBorder(true).SetBorderPadding(0, 0, 1, 1)
 
-	logsView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			logsView.Clear()
-			app.SetFocus(stepsTree)
+			view.Clear()
+			cTui.app.SetFocus(cTui.steps.tree)
 		}
 
 		if event.Rune() == 'b' {
-			app.SetFocus(branchSelect)
+			cTui.app.SetFocus(cTui.branchSelect)
 		}
 
 		if event.Rune() == 'd' {
-			app.Stop()
-			fmt.Printf("circlog logs %s -j %d -s %d -i %d -a \"%s\"\n", config.Project, job.JobNumber, action.Step, action.Index, action.AllocationId)
+			cTui.app.Stop()
+			fmt.Printf("circlog logs %s -j %d -s %d -i %d -a \"%s\"\n",
+				cTui.config.Project,
+				cTui.tuiState.job.JobNumber,
+				cTui.tuiState.action.Step,
+				cTui.tuiState.action.Index,
+				cTui.tuiState.action.AllocationId,
+			)
 		}
 
 		return event
 	})
 
-	app.SetFocus(logsview)
+	view.SetFocusFunc(func() {
+		cTui.controls.SetText(cTui.controlBindings)
+	})
+
+	return logsView{
+		view: view,
+	}
+}
+
+func (l logsView) updateLogsView(logs string) {
+	l.view.SetText(logs).ScrollToBeginning()
 }
