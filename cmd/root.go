@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/lupinelab/circlog/config"
 	"github.com/lupinelab/circlog/tui"
 	"github.com/spf13/cobra"
@@ -12,9 +10,9 @@ var rootCmd = &cobra.Command{
 	Use:   "circlog [project]",
 	Short: "CircleCI CLI tool",
 	Args:  cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var project string
-		
+
 		if len(args) > 0 {
 			project = args[0]
 		} else {
@@ -27,15 +25,12 @@ var rootCmd = &cobra.Command{
 
 		config, err := config.NewConfig(project, vcs, org, branch)
 		if err != nil {
-			fmt.Println(err.Error())
-			return
+			return err
 		}
 
-		tui.Run(config)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
+		circlogTui := tui.NewCirclogTui(config)
+
+		return circlogTui.Run()
 	},
 }
 

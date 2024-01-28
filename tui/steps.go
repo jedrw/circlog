@@ -6,34 +6,67 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
-	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
 
-func newStepsTree() *tview.TreeView {
-	stepsTree := tview.NewTreeView()
-	stepsTree.SetTitle(" STEPS ").SetBorder(true)
-
-	return stepsTree
+type stepsTree struct {
+	tree *tview.TreeView
 }
 
-func updateStepsTree(config config.CirclogConfig, job circleci.Job) {
+func (cTui *CirclogTui) newStepsTree() stepsTree {
+	tree := tview.NewTreeView()
+	tree.SetTitle(" STEPS ").SetBorder(true)
+
+	tree.SetSelectedFunc(func(node *tview.TreeNode) {
+		cTui.tuiState.action = node.GetReference().(circleci.Action)
+		logs, _ := circleci.GetStepLogs(
+			cTui.config,
+			cTui.tuiState.job.JobNumber,
+			cTui.tuiState.action.Step,
+			cTui.tuiState.action.Index,
+			cTui.tuiState.action.AllocationId,
+		)
+		cTui.logs.updateLogsView(logs)
+		cTui.app.SetFocus(cTui.logs.view)
+	})
+
+	tree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEsc {
+			tree.GetRoot().ClearChildren()
+			cTui.app.SetFocus(cTui.jobs.table)
+		}
+
+		if event.Rune() == 'b' {
+			cTui.app.SetFocus(cTui.branchSelect)
+		}
+
+		if event.Rune() == 'd' {
+			cTui.app.Stop()
+			fmt.Printf("circlog steps %s -j %d\n", cTui.config.Project, cTui.tuiState.job.JobNumber)
+		}
+
+		return event
+	})
+
+	tree.SetFocusFunc(func() {
+		cTui.controls.SetText(cTui.controlBindings)
+	})
+
+	return stepsTree{
+		tree: tree,
+	}
+}
+
+func (s stepsTree) populateStepsTree(job circleci.Job, jobDetails circleci.JobDetails) {
 	jobNode := tview.NewTreeNode(job.Name)
 
-	stepsTree.SetRoot(jobNode).
+	s.tree.SetRoot(jobNode).
 		SetCurrentNode(jobNode).
 		SetGraphics(true).
 		SetTopLevel(1)
 
-	stepsTree.SetSelectedFunc(func(node *tview.TreeNode) {
-		action := node.GetReference().(circleci.Action)
-		updateLogsView(config, job, action, logsView)
-	})
-
-	steps, _ := circleci.GetJobSteps(config, job.JobNumber)
-
-	if len(steps.Steps) != 0 {
-		for i, step := range steps.Steps {
+	if len(jobDetails.Steps) != 0 {
+		for i, step := range jobDetails.Steps {
 			stepNode := tview.NewTreeNode(step.Name).
 				SetSelectable(false).
 				SetReference(step)
@@ -43,10 +76,10 @@ func updateStepsTree(config config.CirclogConfig, job circleci.Job) {
 				if action.Status == circleci.RUNNING {
 					actionDuration = time.Since(action.StartTime).Round(time.Millisecond).String()
 				} else {
-					if i == len(steps.Steps)-1 {
+					if i == len(jobDetails.Steps)-1 {
 						actionDuration = job.StoppedAt.Sub(action.StartTime).Round(time.Millisecond).String()
 					} else {
-						actionDuration = steps.Steps[i+1].Actions[0].StartTime.Sub(action.StartTime).Round(time.Millisecond).String()
+						actionDuration = jobDetails.Steps[i+1].Actions[0].StartTime.Sub(action.StartTime).Round(time.Millisecond).String()
 					}
 				}
 
@@ -54,7 +87,7 @@ func updateStepsTree(config config.CirclogConfig, job circleci.Job) {
 					SetSelectable(true).
 					SetReference(action).
 					SetColor(colourByStatus[action.Status])
-				
+
 				stepNode.AddChild(actionNode)
 			}
 		}
@@ -63,23 +96,4 @@ func updateStepsTree(config config.CirclogConfig, job circleci.Job) {
 		jobNode.AddChild(noneNode)
 	}
 
-	stepsTree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc {
-			stepsTree.GetRoot().ClearChildren()
-			app.SetFocus(jobsTable)
-		}
-
-		if event.Rune() == 'b' {
-			app.SetFocus(branchSelect)
-		}
-		
-		if event.Rune() == 'd' {
-			app.Stop()
-			fmt.Printf("circlog steps %s -j %d\n", config.Project, job.JobNumber)
-		}
-
-		return event
-	})
-
-	app.SetFocus(stepsTree)
 }

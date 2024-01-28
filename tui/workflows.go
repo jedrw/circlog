@@ -6,65 +6,72 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/lupinelab/circlog/circleci"
-	"github.com/lupinelab/circlog/config"
 	"github.com/rivo/tview"
 )
 
-func newWorkflowsTable(config config.CirclogConfig) *tview.Table {
-	workflowsTable := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
-	workflowsTable.SetTitle(" WORKFLOWS ").SetBorder(true)
-
-	return workflowsTable
+type workflowsTable struct {
+	table *tview.Table
 }
 
-func updateWorkflowsTable(config config.CirclogConfig, pipeline circleci.Pipeline) {
-	workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(config, pipeline.Id, 1, "")
-
-	workflowsTable.Clear()
+func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
+	table := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
+	table.SetTitle(" WORKFLOWS ").SetBorder(true)
 
 	for column, header := range []string{"Name", "Duration"} {
-		workflowsTable.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
+		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
 	}
 
-	addWorkflowsToTable(workflows, workflowsTable.GetRowCount(), nextPageToken)
+	table.SetSelectedFunc(func(row int, col int) {
+		cell := table.GetCell(row, 0)
+		cellRef := cell.GetReference()
+		switch cellRef := cellRef.(type) {
+		case circleci.Workflow:
+			cTui.tuiState.workflow = cellRef
+			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.tuiState.workflow.Id, 1, "")
+			cTui.jobs.populateTable(jobs, nextPageToken)
+			cTui.app.SetFocus(cTui.jobs.table)
+		case string:
+			if cell.Text == "..." {
+				nextPageToken := cell.GetReference().(string)
+				newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.tuiState.pipeline.Id, 1, nextPageToken)
+				cTui.workflows.addWorkflowsToTable(newWorkflows, table.GetRowCount(), nextPageToken)
+			}
+		}
+	})
 
-	workflowsTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			workflowsTable.Clear()
-			app.SetFocus(pipelinesTable)
+			cTui.workflows.clear()
+			cTui.app.SetFocus(cTui.pipelines.table)
 		}
 
 		if event.Rune() == 'b' {
-			app.SetFocus(branchSelect)
+			cTui.app.SetFocus(cTui.branchSelect)
 		}
 
 		if event.Rune() == 'd' {
-			app.Stop()
-			fmt.Printf("circlog workflows %s -l %s\n", config.Project, pipeline.Id)
+			cTui.app.Stop()
+			fmt.Printf("circlog workflows %s -l %s\n", cTui.config.Project, cTui.tuiState.pipeline.Id)
 		}
 
 		return event
 	})
 
-	workflowsTable.SetSelectedFunc(func(row int, col int) {
-		cell := workflowsTable.GetCell(row, 0)
-		cellRef := cell.GetReference()
-		switch cellRef := cellRef.(type) {
-		case circleci.Workflow:
-			updateJobsTable(config, config.Project, cellRef, jobsTable)
-		case string:
-			if cell.Text == "..." {
-				nextPageToken := cell.GetReference().(string)
-				newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(config, pipeline.Id, 1, nextPageToken)
-				addWorkflowsToTable(newWorkflows, workflowsTable.GetRowCount(), nextPageToken)
-			}
-		}
+	table.SetFocusFunc(func() {
+		cTui.controls.SetText(cTui.controlBindings)
 	})
 
-	app.SetFocus(workflowsTable)
+	return workflowsTable{
+		table: table,
+	}
 }
 
-func addWorkflowsToTable(workflows []circleci.Workflow, startRow int, nextPageToken string) {
+func (w workflowsTable) populateWorkflowsTable(workflows []circleci.Workflow, nextPageToken string) {
+	w.clear()
+	w.addWorkflowsToTable(workflows, 1, nextPageToken)
+}
+
+func (w workflowsTable) addWorkflowsToTable(workflows []circleci.Workflow, startRow int, nextPageToken string) {
 	if len(workflows) != 0 {
 		for row, workflow := range workflows {
 			var workflowDuration string
@@ -77,18 +84,25 @@ func addWorkflowsToTable(workflows []circleci.Workflow, startRow int, nextPageTo
 			for column, attr := range []string{workflow.Name, workflowDuration} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(workflow.Status))
 				cell.SetReference(workflow)
-				workflowsTable.SetCell(row+1, column, cell)
+				w.table.SetCell(row+1, column, cell)
 			}
 		}
 
 		if nextPageToken != "" {
 			cell := tview.NewTableCell("...")
 			cell.SetReference(nextPageToken)
-			workflowsTable.SetCell(workflowsTable.GetRowCount(), 0, cell)
+			w.table.SetCell(w.table.GetRowCount(), 0, cell)
 		}
 
 	} else {
 		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
-		workflowsTable.SetCell(1, 0, cell)
+		w.table.SetCell(1, 0, cell)
+	}
+}
+
+func (w workflowsTable) clear() {
+	row := 1
+	for row < w.table.GetRowCount() {
+		w.table.RemoveRow(row)
 	}
 }
