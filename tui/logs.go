@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gdamore/tcell/v2"
@@ -8,7 +9,9 @@ import (
 )
 
 type logsView struct {
-	view *tview.TextView
+	view          *tview.TextView
+	refreshCtx    context.Context
+	refreshCancel context.CancelFunc
 }
 
 func (cTui *CirclogTui) newLogsView() logsView {
@@ -17,15 +20,18 @@ func (cTui *CirclogTui) newLogsView() logsView {
 
 	view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
+			cTui.logs.refreshCancel()
 			view.Clear()
 			cTui.app.SetFocus(cTui.steps.tree)
+
+			return event
 		}
 
-		if event.Rune() == 'b' {
+		switch event.Rune() {
+		case 'b':
 			cTui.app.SetFocus(cTui.branchSelect)
-		}
 
-		if event.Rune() == 'd' {
+		case 'd':
 			cTui.app.Stop()
 			fmt.Printf("circlog logs %s -j %d -s %d -i %d -a \"%s\"\n",
 				cTui.config.Project,
@@ -40,11 +46,18 @@ func (cTui *CirclogTui) newLogsView() logsView {
 	})
 
 	view.SetFocusFunc(func() {
+		cTui.logs.refreshCancel()
 		cTui.controls.SetText(cTui.controlBindings)
+		cTui.logs.refreshCtx, cTui.logs.refreshCancel = context.WithCancel(context.TODO())
+		go cTui.refreshLogsView(cTui.logs.refreshCtx)
 	})
 
+	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
+
 	return logsView{
-		view: view,
+		view:          view,
+		refreshCtx:    refreshCtx,
+		refreshCancel: refreshCancel,
 	}
 }
 

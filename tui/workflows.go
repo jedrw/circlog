@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,7 +11,10 @@ import (
 )
 
 type workflowsTable struct {
-	table *tview.Table
+	table         *tview.Table
+	numPages      int
+	refreshCtx    context.Context
+	refreshCancel context.CancelFunc
 }
 
 func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
@@ -21,7 +25,7 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
 	}
 
-	table.SetSelectedFunc(func(row int, col int) {
+	table.SetSelectedFunc(func(row int, _ int) {
 		cell := table.GetCell(row, 0)
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
@@ -30,26 +34,34 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.tuiState.workflow.Id, 1, "")
 			cTui.jobs.populateTable(jobs, nextPageToken)
 			cTui.app.SetFocus(cTui.jobs.table)
+		
 		case string:
 			if cell.Text == "..." {
+				cTui.workflows.refreshCancel()
 				nextPageToken := cell.GetReference().(string)
 				newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.tuiState.pipeline.Id, 1, nextPageToken)
 				cTui.workflows.addWorkflowsToTable(newWorkflows, table.GetRowCount(), nextPageToken)
+				cTui.workflows.numPages++
+				cTui.workflows.refreshCtx, cTui.workflows.refreshCancel = context.WithCancel(context.TODO())
+				go cTui.refreshWorkflowsTable(cTui.workflows.refreshCtx)		
 			}
 		}
 	})
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
+			cTui.workflows.refreshCancel()
 			cTui.workflows.clear()
 			cTui.app.SetFocus(cTui.pipelines.table)
+
+			return event
 		}
 
-		if event.Rune() == 'b' {
+		switch event.Rune() {
+		case'b':
 			cTui.app.SetFocus(cTui.branchSelect)
-		}
-
-		if event.Rune() == 'd' {
+		
+		case 'd':
 			cTui.app.Stop()
 			fmt.Printf("circlog workflows %s -l %s\n", cTui.config.Project, cTui.tuiState.pipeline.Id)
 		}
@@ -58,11 +70,18 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 	})
 
 	table.SetFocusFunc(func() {
+		cTui.workflows.refreshCancel()
 		cTui.controls.SetText(cTui.controlBindings)
+		cTui.workflows.refreshCtx, cTui.workflows.refreshCancel = context.WithCancel(context.TODO())
+		go cTui.refreshWorkflowsTable(cTui.workflows.refreshCtx)
 	})
 
+	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
+
 	return workflowsTable{
-		table: table,
+		table:         table,
+		refreshCtx:    refreshCtx,
+		refreshCancel: refreshCancel,
 	}
 }
 

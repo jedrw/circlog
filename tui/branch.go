@@ -11,8 +11,8 @@ func (cTui *CirclogTui) initBranchSelect() {
 	cTui.branchSelect.SetLabelColor(tcell.ColorDefault)
 
 	cTui.branchSelect.SetLabel("Branch: ").SetDoneFunc(func(key tcell.Key) {
-		cTui.config.Branch = cTui.branchSelect.GetText()
 		cTui.clearAll()
+		cTui.config.Branch = cTui.branchSelect.GetText()
 		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
 		cTui.pipelines.populateTable(pipelines, nextPageToken)
 		cTui.app.SetFocus(cTui.pipelines.table)

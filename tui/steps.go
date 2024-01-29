@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 )
 
 type stepsTree struct {
-	tree *tview.TreeView
+	tree          *tview.TreeView
+	refreshCtx    context.Context
+	refreshCancel context.CancelFunc
 }
 
 func (cTui *CirclogTui) newStepsTree() stepsTree {
@@ -26,34 +29,46 @@ func (cTui *CirclogTui) newStepsTree() stepsTree {
 			cTui.tuiState.action.Index,
 			cTui.tuiState.action.AllocationId,
 		)
+
 		cTui.logs.updateLogsView(logs)
 		cTui.app.SetFocus(cTui.logs.view)
 	})
 
 	tree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
+			cTui.steps.refreshCancel()
 			tree.GetRoot().ClearChildren()
 			cTui.app.SetFocus(cTui.jobs.table)
+
+			return event
 		}
 
-		if event.Rune() == 'b' {
+		switch event.Rune() {
+		case 'b':
 			cTui.app.SetFocus(cTui.branchSelect)
-		}
 
-		if event.Rune() == 'd' {
+
+		case 'd':
 			cTui.app.Stop()
 			fmt.Printf("circlog steps %s -j %d\n", cTui.config.Project, cTui.tuiState.job.JobNumber)
 		}
-
+		
 		return event
 	})
 
 	tree.SetFocusFunc(func() {
+		cTui.steps.refreshCancel()
 		cTui.controls.SetText(cTui.controlBindings)
+		cTui.steps.refreshCtx, cTui.steps.refreshCancel = context.WithCancel(context.TODO())
+		go cTui.refreshStepsTree(cTui.steps.refreshCtx)
 	})
+
+	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
 
 	return stepsTree{
 		tree: tree,
+		refreshCtx: refreshCtx,
+		refreshCancel: refreshCancel,
 	}
 }
 
@@ -96,4 +111,12 @@ func (s stepsTree) populateStepsTree(job circleci.Job, jobDetails circleci.JobDe
 		jobNode.AddChild(noneNode)
 	}
 
+}
+
+func (s stepsTree) clear() {
+	stepNodes := s.tree.GetRowCount()
+	s.tree.GetRoot()
+	if stepNodes > 0 {
+		s.tree.GetRoot().ClearChildren()
+	}
 }
