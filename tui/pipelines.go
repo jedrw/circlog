@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,7 +11,10 @@ import (
 )
 
 type pipelinesTable struct {
-	table *tview.Table
+	table         *tview.Table
+	numPages      int
+	refreshCtx    context.Context
+	refreshCancel context.CancelFunc
 }
 
 func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
@@ -21,7 +25,7 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
 	}
 
-	table.SetSelectedFunc(func(row int, col int) {
+	table.SetSelectedFunc(func(row int, _ int) {
 		cell := table.GetCell(row, 0)
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
@@ -32,9 +36,13 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 			cTui.app.SetFocus(cTui.workflows.table)
 		case string:
 			if cell.Text == "..." {
+				cTui.pipelines.refreshCancel()
 				nextPageToken := cell.GetReference().(string)
 				newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, nextPageToken)
 				cTui.pipelines.addPipelinesToTable(newPipelines, table.GetRowCount()-1, nextPageToken)
+				cTui.pipelines.numPages++
+				cTui.pipelines.refreshCtx, cTui.pipelines.refreshCancel = context.WithCancel(context.TODO())
+				go cTui.refreshPipelinesTable(cTui.pipelines.refreshCtx)
 			}
 		}
 	})
@@ -45,9 +53,12 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 			cTui.config.Project = ""
 			cTui.config.Branch = ""
 			cTui.app.SetFocus(cTui.projectSelect)
+
+			return event
 		}
 
-		if event.Rune() == 'f' {
+		switch event.Rune() {
+		case 'f':
 			cell := table.GetCell(table.GetSelection())
 			cellRef := cell.GetReference()
 			switch cellRef := cellRef.(type) {
@@ -60,13 +71,12 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 					cTui.branchSelect.SetText(cTui.config.Branch)
 				}
 			}
-		}
 
-		if event.Rune() == 'b' {
+		case 'b':
 			cTui.app.SetFocus(cTui.branchSelect)
-		}
 
-		if event.Rune() == 'd' {
+		case 'd':
+			cTui.refreshCancelAll()
 			cTui.app.Stop()
 			fmt.Printf("circlog pipelines %s\n", cTui.config.Project)
 		}
@@ -83,17 +93,24 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 	`
 
 	table.SetFocusFunc(func() {
+		cTui.pipelines.refreshCancel()
 		cTui.controls.SetText(pipelinesControlBindings)
+		cTui.pipelines.refreshCtx, cTui.pipelines.refreshCancel = context.WithCancel(context.TODO())
+		go cTui.refreshPipelinesTable(cTui.pipelines.refreshCtx)
 	})
 
+	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
+
 	return pipelinesTable{
-		table: table,
+		table:         table,
+		refreshCtx:    refreshCtx,
+		refreshCancel: refreshCancel,
 	}
 }
 
 func (p pipelinesTable) populateTable(pipelines []circleci.Pipeline, nextPageToken string) {
+	p.clear()
 	p.addPipelinesToTable(pipelines, p.table.GetRowCount(), nextPageToken)
-	p.table.ScrollToBeginning().Select(0, 0)
 }
 
 func (p pipelinesTable) addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {

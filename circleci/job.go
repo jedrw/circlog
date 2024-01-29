@@ -46,10 +46,6 @@ type Organisation struct {
 	Name string `json:"name"`
 }
 
-type JobDetails struct {
-	Steps []Step `json:"steps"`
-}
-
 func GetWorkflowJobs(config config.CirclogConfig, workflowId string, numPages int, nextPageToken string) ([]Job, string, error) {
 	url := fmt.Sprintf("%s/workflow/%s/job", CIRCLECI_ENDPOINT_V2, workflowId)
 

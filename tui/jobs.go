@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -11,7 +12,10 @@ import (
 )
 
 type jobsTable struct {
-	table *tview.Table
+	table         *tview.Table
+	numPages      int
+	refreshCtx    context.Context
+	refreshCancel context.CancelFunc
 }
 
 func (cTui *CirclogTui) newJobsTable() jobsTable {
@@ -22,7 +26,7 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
 	}
 
-	table.SetSelectedFunc(func(row int, col int) {
+	table.SetSelectedFunc(func(row int, _ int) {
 		cell := table.GetCell(row, 0)
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
@@ -33,24 +37,31 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 			cTui.app.SetFocus(cTui.steps.tree)
 		case string:
 			if cell.Text == "..." {
+				cTui.jobs.refreshCancel()
 				nextPageToken := cell.GetReference().(string)
 				newJobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.tuiState.workflow.Id, 1, nextPageToken)
 				cTui.jobs.addJobsToTable(newJobs, table.GetRowCount()-1, nextPageToken)
+				cTui.jobs.numPages++
+				cTui.jobs.refreshCtx, cTui.jobs.refreshCancel = context.WithCancel(context.TODO())
+				go cTui.refreshJobsTable(cTui.jobs.refreshCtx)
 			}
 		}
 	})
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
+			cTui.jobs.refreshCancel()
 			cTui.jobs.clear()
 			cTui.app.SetFocus(cTui.workflows.table)
+
+			return event
 		}
 
-		if event.Rune() == 'b' {
+		switch event.Rune() {
+		case 'b':
 			cTui.app.SetFocus(cTui.branchSelect)
-		}
-
-		if event.Rune() == 'd' {
+		
+		case 'd':
 			cTui.app.Stop()
 			fmt.Printf("circlog jobs %s -w %s\n", cTui.config.Project, cTui.tuiState.workflow.Id)
 		}
@@ -59,11 +70,18 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 	})
 
 	table.SetFocusFunc(func() {
+		cTui.jobs.refreshCancel()
 		cTui.controls.SetText(cTui.controlBindings)
+		cTui.jobs.refreshCtx, cTui.jobs.refreshCancel = context.WithCancel(context.TODO())
+		go cTui.refreshJobsTable(cTui.jobs.refreshCtx)
 	})
-	
+
+	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
+
 	return jobsTable{
-		table: table,
+		table:         table,
+		refreshCtx:    refreshCtx,
+		refreshCancel: refreshCancel,
 	}
 }
 

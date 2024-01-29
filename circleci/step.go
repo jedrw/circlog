@@ -10,6 +10,15 @@ import (
 	"github.com/lupinelab/circlog/config"
 )
 
+type JobDetails struct {
+	Steps []Step `json:"steps"`
+}
+
+type Step struct {
+	Name    string   `json:"name"`
+	Actions []Action `json:"actions"`
+}
+
 type Action struct {
 	Index              int64     `json:"index"`
 	Step               int64     `json:"step"`
@@ -31,11 +40,6 @@ type Action struct {
 	InfrastructureFail bool      `json:"infrastructure_fail"`
 	Timedout           bool      `json:"timedout"`
 	Canceled           bool      `json:"canceled"`
-}
-
-type Step struct {
-	Name    string   `json:"name"`
-	Actions []Action `json:"actions"`
 }
 
 func GetJobSteps(config config.CirclogConfig, jobNumber int64) (JobDetails, error) {

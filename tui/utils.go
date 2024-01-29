@@ -19,12 +19,19 @@ func branchOrTag(pipeline circleci.Pipeline) string {
 }
 
 func (cTui *CirclogTui) clearAll() {
+	cTui.refreshCancelAll()
+	
 	cTui.logs.view.Clear()
-	stepNodes := cTui.steps.tree.GetRowCount()
-	if stepNodes > 0 {
-		cTui.steps.tree.GetRoot().ClearChildren()
-	}
+	cTui.steps.clear()
 	cTui.jobs.clear()
 	cTui.workflows.clear()
 	cTui.pipelines.clear()
+}
+
+func (cTui *CirclogTui) refreshCancelAll() {
+	cTui.logs.refreshCancel()
+	cTui.steps.refreshCancel()
+	cTui.jobs.refreshCancel()
+	cTui.workflows.refreshCancel()
+	cTui.pipelines.refreshCancel()
 }
