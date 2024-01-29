@@ -146,7 +146,6 @@ func (cTui *CirclogTui) initNavLayout() {
 }
 
 func (cTui *CirclogTui) refreshPipelinesTable(ctx context.Context) {
-	cTui.pipelines.numPages = 1
 	pipelinesChan := make(chan []circleci.Pipeline)
 	nextPageTokenChan := make(chan string)
 
@@ -168,14 +167,13 @@ func (cTui *CirclogTui) refreshPipelinesTable(ctx context.Context) {
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
 				cTui.pipelines.clear()
-				cTui.pipelines.addPipelinesToTable(pipelines, ((cTui.pipelines.numPages-1)*20)+1, nextPageToken)
+				cTui.pipelines.addPipelinesToTable(pipelines, 1, nextPageToken)
 			})
 		}
 	}
 }
 
 func (cTui *CirclogTui) refreshWorkflowsTable(ctx context.Context) {
-	cTui.workflows.numPages = 1
 	workflowsChan := make(chan []circleci.Workflow)
 	nextPageTokenChan := make(chan string)
 
@@ -197,14 +195,13 @@ func (cTui *CirclogTui) refreshWorkflowsTable(ctx context.Context) {
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
 				cTui.workflows.clear()
-				cTui.workflows.addWorkflowsToTable(workflows, ((cTui.workflows.numPages-1)*20)+1, nextPageToken)
+				cTui.workflows.addWorkflowsToTable(workflows, 1, nextPageToken)
 			})
 		}
 	}
 }
 
 func (cTui *CirclogTui) refreshJobsTable(ctx context.Context) {
-	cTui.jobs.numPages = 1
 	jobsChan := make(chan []circleci.Job)
 	nextPageTokenChan := make(chan string)
 	
@@ -226,7 +223,7 @@ func (cTui *CirclogTui) refreshJobsTable(ctx context.Context) {
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {	
 				cTui.jobs.clear()
-				cTui.jobs.addJobsToTable(jobs, ((cTui.jobs.numPages-1)*20)+1, nextPageToken)
+				cTui.jobs.addJobsToTable(jobs, 1, nextPageToken)
 			})
 		}
 	}
