@@ -34,6 +34,7 @@ func (cTui *CirclogTui) newLogsView() logsView {
 			cTui.logs.autoScroll = !cTui.logs.autoScroll
 			if cTui.logs.autoScroll {
 				view.SetTitle(" LOGS - Autoscroll Enabled ")
+				view.ScrollToEnd()
 			} else {
 				view.SetTitle(" LOGS - Autoscroll Disabled	 ")
 			}

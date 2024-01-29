@@ -31,6 +31,10 @@ func (cTui *CirclogTui) newStepsTree() stepsTree {
 		)
 
 		cTui.logs.updateLogsView(logs)
+		if cTui.logs.autoScroll {
+			cTui.logs.view.ScrollToEnd()
+		}
+		
 		cTui.app.SetFocus(cTui.logs.view)
 	})
 
