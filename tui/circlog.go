@@ -51,6 +51,7 @@ const refreshInterval = 1
 var (
 	controlBindings = `Move	           [Up/Down]
 		Select               [Enter]
+		Select branch            [B]
 		Dump command             [D]
 		Back/Quit              [Esc]
 	`
@@ -163,9 +164,9 @@ func (cTui *CirclogTui) refreshPipelinesTable(ctx context.Context) {
 			return
 
 		default:
+			pipelines := <- pipelinesChan
+			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
-				pipelines := <- pipelinesChan
-				nextPageToken := <-nextPageTokenChan
 				cTui.pipelines.clear()
 				cTui.pipelines.addPipelinesToTable(pipelines, ((cTui.pipelines.numPages-1)*20)+1, nextPageToken)
 			})
@@ -192,9 +193,9 @@ func (cTui *CirclogTui) refreshWorkflowsTable(ctx context.Context) {
 			return
 		
 		default:
+			workflows := <- workflowsChan
+			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
-				workflows := <- workflowsChan
-				nextPageToken := <-nextPageTokenChan
 				cTui.workflows.clear()
 				cTui.workflows.addWorkflowsToTable(workflows, ((cTui.workflows.numPages-1)*20)+1, nextPageToken)
 			})
@@ -221,9 +222,9 @@ func (cTui *CirclogTui) refreshJobsTable(ctx context.Context) {
 			return
 		
 		default:
+			jobs := <- jobsChan
+			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {	
-				jobs := <- jobsChan
-				nextPageToken := <-nextPageTokenChan
 				cTui.jobs.clear()
 				cTui.jobs.addJobsToTable(jobs, ((cTui.jobs.numPages-1)*20)+1, nextPageToken)
 			})
@@ -249,14 +250,15 @@ func (cTui *CirclogTui) refreshStepsTree(ctx context.Context) {
 			return
 		
 		default:
+			jobDetails := <- stepsChan
 			cTui.app.QueueUpdateDraw(func() {	
-				jobDetails := <- stepsChan
-				currentNodeText := cTui.steps.tree.GetCurrentNode().GetText()
+				currentNode := cTui.steps.tree.GetCurrentNode().GetReference().(circleci.Action)
 				cTui.steps.clear()
 				cTui.steps.populateStepsTree(cTui.tuiState.job, jobDetails)
 				for _, step := range cTui.steps.tree.GetRoot().GetChildren() {
 					for _, action := range step.GetChildren() {
-						if action.GetText() == currentNodeText {
+						node := action.GetReference().(circleci.Action)
+						if node.Step == currentNode.Step && node.Index == currentNode.Index {
 							cTui.steps.tree.SetCurrentNode(action)
 						}
 					}
@@ -293,7 +295,11 @@ func (cTui *CirclogTui) refreshLogsView(ctx context.Context) {
 			cTui.app.QueueUpdateDraw(func() {		
 				row, col := cTui.logs.view.GetScrollOffset()
 				cTui.logs.updateLogsView(logs)
-				cTui.logs.view.ScrollTo(row, col)
+				if cTui.logs.autoScroll {
+					cTui.logs.view.ScrollToEnd()
+				} else {
+					cTui.logs.view.ScrollTo(row, col)
+				}
 			})
 		}
 	}
