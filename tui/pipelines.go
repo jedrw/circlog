@@ -34,6 +34,7 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 			workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.tuiState.pipeline.Id, 1, "")
 			cTui.workflows.populateWorkflowsTable(workflows, nextPageToken)
 			cTui.app.SetFocus(cTui.workflows.table)
+		
 		case string:
 			if cell.Text == "..." {
 				cTui.pipelines.refreshCancel()
@@ -64,8 +65,9 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 			switch cellRef := cellRef.(type) {
 			case circleci.Pipeline:
 				if cellRef.Vcs.Branch != "" {
+					cTui.pipelines.numPages = 1
 					cTui.config.Branch = cellRef.Vcs.Branch
-					pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
+					pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, cTui.pipelines.numPages, "")
 					cTui.pipelines.clear()
 					cTui.pipelines.populateTable(pipelines, nextPageToken)
 					cTui.branchSelect.SetText(cTui.config.Branch)
@@ -73,6 +75,7 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 			}
 
 		case 'b':
+			cTui.pipelines.numPages = 1
 			cTui.app.SetFocus(cTui.branchSelect)
 
 		case 'd':
@@ -103,6 +106,7 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 
 	return pipelinesTable{
 		table:         table,
+		numPages:      1,
 		refreshCtx:    refreshCtx,
 		refreshCancel: refreshCancel,
 	}

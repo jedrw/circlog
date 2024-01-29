@@ -34,16 +34,16 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.tuiState.workflow.Id, 1, "")
 			cTui.jobs.populateTable(jobs, nextPageToken)
 			cTui.app.SetFocus(cTui.jobs.table)
-		
+
 		case string:
 			if cell.Text == "..." {
 				cTui.workflows.refreshCancel()
 				nextPageToken := cell.GetReference().(string)
 				newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.tuiState.pipeline.Id, 1, nextPageToken)
-				cTui.workflows.addWorkflowsToTable(newWorkflows, table.GetRowCount(), nextPageToken)
+				cTui.workflows.addWorkflowsToTable(newWorkflows, table.GetRowCount()-1, nextPageToken)
 				cTui.workflows.numPages++
 				cTui.workflows.refreshCtx, cTui.workflows.refreshCancel = context.WithCancel(context.TODO())
-				go cTui.refreshWorkflowsTable(cTui.workflows.refreshCtx)		
+				go cTui.refreshWorkflowsTable(cTui.workflows.refreshCtx)
 			}
 		}
 	})
@@ -58,9 +58,10 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 		}
 
 		switch event.Rune() {
-		case'b':
+		case 'b':
+			cTui.workflows.numPages = 1
 			cTui.app.SetFocus(cTui.branchSelect)
-		
+
 		case 'd':
 			cTui.app.Stop()
 			fmt.Printf("circlog workflows %s -l %s\n", cTui.config.Project, cTui.tuiState.pipeline.Id)
@@ -80,6 +81,7 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 
 	return workflowsTable{
 		table:         table,
+		numPages:      1,
 		refreshCtx:    refreshCtx,
 		refreshCancel: refreshCancel,
 	}

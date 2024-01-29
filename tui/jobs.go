@@ -35,6 +35,7 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.tuiState.job.JobNumber)
 			cTui.steps.populateStepsTree(cTui.tuiState.job, jobDetails)
 			cTui.app.SetFocus(cTui.steps.tree)
+		
 		case string:
 			if cell.Text == "..." {
 				cTui.jobs.refreshCancel()
@@ -59,8 +60,9 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 
 		switch event.Rune() {
 		case 'b':
+			cTui.jobs.numPages = 1
 			cTui.app.SetFocus(cTui.branchSelect)
-		
+
 		case 'd':
 			cTui.app.Stop()
 			fmt.Printf("circlog jobs %s -w %s\n", cTui.config.Project, cTui.tuiState.workflow.Id)
@@ -80,6 +82,7 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 
 	return jobsTable{
 		table:         table,
+		numPages:      1,
 		refreshCtx:    refreshCtx,
 		refreshCancel: refreshCancel,
 	}
