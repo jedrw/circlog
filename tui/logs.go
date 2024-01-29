@@ -10,13 +10,14 @@ import (
 
 type logsView struct {
 	view          *tview.TextView
+	autoScroll    bool
 	refreshCtx    context.Context
 	refreshCancel context.CancelFunc
 }
 
 func (cTui *CirclogTui) newLogsView() logsView {
 	view := tview.NewTextView()
-	view.SetTitle(" LOGS ").SetBorder(true).SetBorderPadding(0, 0, 1, 1)
+	view.SetTitle(" LOGS - Autoscroll Enabled ").SetBorder(true).SetBorderPadding(0, 0, 1, 1)
 
 	view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
@@ -28,6 +29,17 @@ func (cTui *CirclogTui) newLogsView() logsView {
 		}
 
 		switch event.Rune() {
+		case 'a':
+			cTui.logs.refreshCancel()
+			cTui.logs.autoScroll = !cTui.logs.autoScroll
+			if cTui.logs.autoScroll {
+				view.SetTitle(" LOGS - Autoscroll Enabled ")
+			} else {
+				view.SetTitle(" LOGS - Autoscroll Disabled	 ")
+			}
+			cTui.logs.refreshCtx, cTui.logs.refreshCancel = context.WithCancel(context.TODO())
+			go cTui.refreshLogsView(cTui.logs.refreshCtx)
+
 		case 'b':
 			cTui.app.SetFocus(cTui.branchSelect)
 
@@ -45,9 +57,17 @@ func (cTui *CirclogTui) newLogsView() logsView {
 		return event
 	})
 
+	logsControlBindings := `Move	           [Up/Down]
+		Select               [Enter]
+		Toggle Autoscroll        [A]
+		Select branch            [B]
+		Dump command             [D]
+		Back/Quit              [Esc]
+	`
+
 	view.SetFocusFunc(func() {
 		cTui.logs.refreshCancel()
-		cTui.controls.SetText(cTui.controlBindings)
+		cTui.controls.SetText(logsControlBindings)
 		cTui.logs.refreshCtx, cTui.logs.refreshCancel = context.WithCancel(context.TODO())
 		go cTui.refreshLogsView(cTui.logs.refreshCtx)
 	})
@@ -56,6 +76,7 @@ func (cTui *CirclogTui) newLogsView() logsView {
 
 	return logsView{
 		view:          view,
+		autoScroll:    true,
 		refreshCtx:    refreshCtx,
 		refreshCancel: refreshCancel,
 	}
