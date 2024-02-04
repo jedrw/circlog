@@ -18,8 +18,10 @@ type pipelinesTable struct {
 }
 
 func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
-	table := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
-	table.SetTitle(" PIPELINES ").SetBorder(true)
+	table := tview.NewTable()
+	table.SetTitle(" PIPELINES ")
+	table.SetBorder(true)
+	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 
 	for column, header := range []string{"Number", "Branch/Tag", "Start", "Trigger"} {
 		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
@@ -29,6 +31,7 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 		cell := table.GetCell(row, 0)
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
+		
 		case circleci.Pipeline:
 			cTui.tuiState.pipeline = cellRef
 			workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.tuiState.pipeline.Id, 1, "")
@@ -59,6 +62,7 @@ func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
 		}
 
 		switch event.Rune() {
+		
 		case 'f':
 			cell := table.GetCell(table.GetSelection())
 			cellRef := cell.GetReference()

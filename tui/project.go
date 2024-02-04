@@ -15,6 +15,7 @@ func (cTui *CirclogTui) initProjectSelect() {
 		cTui.config.Project = cTui.projectSelect.GetText()
 		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
 		cTui.pipelines.populateTable(pipelines, nextPageToken)
+		cTui.pipelines.table.ScrollToBeginning()
 		cTui.app.SetFocus(cTui.pipelines.table)
 	})
 

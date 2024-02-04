@@ -19,8 +19,10 @@ type jobsTable struct {
 }
 
 func (cTui *CirclogTui) newJobsTable() jobsTable {
-	table := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
-	table.SetTitle(" JOBS ").SetBorder(true)
+	table := tview.NewTable()
+	table.SetTitle(" JOBS ")
+	table.SetBorder(true)
+	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 
 	for column, header := range []string{"Name", "Duration", "Depends on"} {
 		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
@@ -30,6 +32,7 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 		cell := table.GetCell(row, 0)
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
+		
 		case circleci.Job:
 			cTui.tuiState.job = cellRef
 			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.tuiState.job.JobNumber)
@@ -59,6 +62,7 @@ func (cTui *CirclogTui) newJobsTable() jobsTable {
 		}
 
 		switch event.Rune() {
+		
 		case 'b':
 			cTui.jobs.numPages = 1
 			cTui.app.SetFocus(cTui.branchSelect)

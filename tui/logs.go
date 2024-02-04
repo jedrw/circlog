@@ -17,7 +17,9 @@ type logsView struct {
 
 func (cTui *CirclogTui) newLogsView() logsView {
 	view := tview.NewTextView()
-	view.SetTitle(" LOGS - Autoscroll Enabled ").SetBorder(true).SetBorderPadding(0, 0, 1, 1)
+	view.SetTitle(" LOGS - Autoscroll Enabled ")
+	view.SetBorder(true).SetBorderPadding(0, 0, 1, 1)
+	view.SetDynamicColors(true)
 
 	view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
@@ -29,6 +31,7 @@ func (cTui *CirclogTui) newLogsView() logsView {
 		}
 
 		switch event.Rune() {
+		
 		case 'a':
 			cTui.logs.refreshCancel()
 			cTui.logs.autoScroll = !cTui.logs.autoScroll
@@ -84,5 +87,5 @@ func (cTui *CirclogTui) newLogsView() logsView {
 }
 
 func (l logsView) updateLogsView(logs string) {
-	l.view.SetText(logs).ScrollToBeginning()
+	l.view.SetText(tview.TranslateANSI(logs))
 }

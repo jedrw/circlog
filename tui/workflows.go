@@ -18,8 +18,10 @@ type workflowsTable struct {
 }
 
 func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
-	table := tview.NewTable().SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
-	table.SetTitle(" WORKFLOWS ").SetBorder(true)
+	table := tview.NewTable()
+	table.SetTitle(" WORKFLOWS ")
+	table.SetBorder(true)
+	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 
 	for column, header := range []string{"Name", "Duration"} {
 		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
@@ -29,6 +31,7 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 		cell := table.GetCell(row, 0)
 		cellRef := cell.GetReference()
 		switch cellRef := cellRef.(type) {
+		
 		case circleci.Workflow:
 			cTui.tuiState.workflow = cellRef
 			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.tuiState.workflow.Id, 1, "")
@@ -58,6 +61,7 @@ func (cTui *CirclogTui) newWorkflowsTable() workflowsTable {
 		}
 
 		switch event.Rune() {
+		
 		case 'b':
 			cTui.workflows.numPages = 1
 			cTui.app.SetFocus(cTui.branchSelect)

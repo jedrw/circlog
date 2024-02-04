@@ -18,7 +18,8 @@ type stepsTree struct {
 
 func (cTui *CirclogTui) newStepsTree() stepsTree {
 	tree := tview.NewTreeView()
-	tree.SetTitle(" STEPS ").SetBorder(true)
+	tree.SetTitle(" STEPS ")
+	tree.SetBorder(true)
 
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		cTui.tuiState.action = node.GetReference().(circleci.Action)
@@ -48,6 +49,7 @@ func (cTui *CirclogTui) newStepsTree() stepsTree {
 		}
 
 		switch event.Rune() {
+		
 		case 'b':
 			cTui.app.SetFocus(cTui.branchSelect)
 
