@@ -22,10 +22,21 @@ func (cTui *CirclogTui) newLogsView() logsView {
 	view.SetDynamicColors(true)
 
 	view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc {
+		switch event.Key() {
+		
+		case tcell.KeyEsc:
 			cTui.logs.refreshCancel()
 			view.Clear()
 			cTui.app.SetFocus(cTui.steps.tree)
+
+			return event
+
+		case tcell.KeyUp:
+			cTui.logs.refreshCancel()
+			cTui.logs.autoScroll = false
+			view.SetTitle(" LOGS - Autoscroll Disabled	 ")
+			cTui.logs.refreshCtx, cTui.logs.refreshCancel = context.WithCancel(context.TODO())
+			go cTui.refreshLogsView(cTui.logs.refreshCtx)
 
 			return event
 		}
