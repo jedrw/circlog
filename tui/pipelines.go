@@ -10,118 +10,54 @@ import (
 	"github.com/rivo/tview"
 )
 
-type pipelinesTable struct {
-	table         *tview.Table
-	numPages      int
-	refreshCtx    context.Context
-	refreshCancel context.CancelFunc
+type pipelinesPane struct {
+	table       *tview.Table
+	numPages    int
+	watchCtx    context.Context
+	watchCancel context.CancelFunc
 }
 
-func (cTui *CirclogTui) newPipelinesTable() pipelinesTable {
-	table := tview.NewTable()
-	table.SetTitle(" PIPELINES ")
-	table.SetBorder(true)
-	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
+func (p *pipelinesPane) watchPipelines(cTui *CirclogTui) {
+	pipelinesChan := make(chan []circleci.Pipeline)
+	nextPageTokenChan := make(chan string)
 
-	for column, header := range []string{"Number", "Branch/Tag", "Start", "Trigger"} {
-		table.SetCell(0, column, tview.NewTableCell(header).SetStyle(tcell.StyleDefault.Attributes(tcell.AttrBold)).SetSelectable(false))
-	}
+	for {
+		go func() {
+			pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, cTui.pipelines.numPages, "")
+			pipelinesChan <- pipelines
+			nextPageTokenChan <- nextPageToken
+		}()
 
-	table.SetSelectedFunc(func(row int, _ int) {
-		cell := table.GetCell(row, 0)
-		cellRef := cell.GetReference()
-		switch cellRef := cellRef.(type) {
-		
-		case circleci.Pipeline:
-			cTui.tuiState.pipeline = cellRef
-			workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.tuiState.pipeline.Id, 1, "")
-			cTui.workflows.populateWorkflowsTable(workflows, nextPageToken)
-			cTui.app.SetFocus(cTui.workflows.table)
-		
-		case string:
-			if cell.Text == "..." {
-				cTui.pipelines.refreshCancel()
-				nextPageToken := cell.GetReference().(string)
-				newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, nextPageToken)
-				cTui.pipelines.addPipelinesToTable(newPipelines, table.GetRowCount()-1, nextPageToken)
-				cTui.pipelines.numPages++
-				cTui.pipelines.refreshCtx, cTui.pipelines.refreshCancel = context.WithCancel(context.TODO())
-				go cTui.refreshPipelinesTable(cTui.pipelines.refreshCtx)
-			}
+		time.Sleep(refreshInterval)
+
+		select {
+		case <-cTui.pipelines.watchCtx.Done():
+			return
+
+		default:
+			pipelines := <-pipelinesChan
+			nextPageToken := <-nextPageTokenChan
+			cTui.app.QueueUpdateDraw(func() {
+				cTui.pipelines.clear()
+				cTui.pipelines.addPipelinesToTable(pipelines, 1, nextPageToken)
+			})
 		}
-	})
-
-	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc {
-			cTui.clearAll()
-			cTui.config.Project = ""
-			cTui.config.Branch = ""
-			cTui.app.SetFocus(cTui.projectSelect)
-
-			return event
-		}
-
-		switch event.Rune() {
-		
-		case 'f':
-			cell := table.GetCell(table.GetSelection())
-			cellRef := cell.GetReference()
-			switch cellRef := cellRef.(type) {
-			case circleci.Pipeline:
-				if cellRef.Vcs.Branch != "" {
-					cTui.pipelines.numPages = 1
-					cTui.config.Branch = cellRef.Vcs.Branch
-					pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, cTui.pipelines.numPages, "")
-					cTui.pipelines.clear()
-					cTui.pipelines.populateTable(pipelines, nextPageToken)
-					cTui.branchSelect.SetText(cTui.config.Branch)
-				}
-			}
-
-		case 'b':
-			cTui.pipelines.numPages = 1
-			cTui.app.SetFocus(cTui.branchSelect)
-
-		case 'd':
-			cTui.refreshCancelAll()
-			cTui.app.Stop()
-			fmt.Printf("circlog pipelines %s\n", cTui.config.Project)
-		}
-
-		return event
-	})
-
-	pipelinesControlBindings := `Move	           [Up/Down]
-		Select               [Enter]
-		Select branch            [B]
-		Filter by branch         [F]
-		Dump command             [D]
-		Back/Quit              [Esc]
-	`
-
-	table.SetFocusFunc(func() {
-		cTui.pipelines.refreshCancel()
-		cTui.controls.SetText(pipelinesControlBindings)
-		cTui.pipelines.refreshCtx, cTui.pipelines.refreshCancel = context.WithCancel(context.TODO())
-		go cTui.refreshPipelinesTable(cTui.pipelines.refreshCtx)
-	})
-
-	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
-
-	return pipelinesTable{
-		table:         table,
-		numPages:      1,
-		refreshCtx:    refreshCtx,
-		refreshCancel: refreshCancel,
 	}
 }
 
-func (p pipelinesTable) populateTable(pipelines []circleci.Pipeline, nextPageToken string) {
+func (p *pipelinesPane) restartWatcher(cTui *CirclogTui, fn func()) {
+	cTui.pipelines.watchCancel()
+	fn()
+	cTui.pipelines.watchCtx, cTui.pipelines.watchCancel = context.WithCancel(context.TODO())
+	go cTui.pipelines.watchPipelines(cTui)
+}
+
+func (p *pipelinesPane) populateTable(pipelines []circleci.Pipeline, nextPageToken string) {
 	p.clear()
 	p.addPipelinesToTable(pipelines, p.table.GetRowCount(), nextPageToken)
 }
 
-func (p pipelinesTable) addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {
+func (p *pipelinesPane) addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {
 	if len(pipelines) != 0 {
 		for row, pipeline := range pipelines {
 			for column, attr := range []string{fmt.Sprint(pipeline.Number), branchOrTag(pipeline), pipeline.CreatedAt.Local().Format(time.RFC822Z), pipeline.Trigger.Type} {
@@ -143,7 +79,7 @@ func (p pipelinesTable) addPipelinesToTable(pipelines []circleci.Pipeline, start
 	}
 }
 
-func (p pipelinesTable) clear() {
+func (p *pipelinesPane) clear() {
 	row := 1
 	for row < p.table.GetRowCount() {
 		p.table.RemoveRow(row)

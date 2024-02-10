@@ -10,75 +10,71 @@ import (
 	"github.com/rivo/tview"
 )
 
-type stepsTree struct {
-	tree          *tview.TreeView
-	refreshCtx    context.Context
-	refreshCancel context.CancelFunc
+type stepsPane struct {
+	tree        *tview.TreeView
+	follow      bool
+	watchCtx    context.Context
+	watchCancel context.CancelFunc
 }
 
-func (cTui *CirclogTui) newStepsTree() stepsTree {
-	tree := tview.NewTreeView()
-	tree.SetTitle(" STEPS ")
-	tree.SetBorder(true)
+func (s stepsPane) watchSteps(cTui *CirclogTui) {
+	stepsChan := make(chan circleci.JobDetails)
 
-	tree.SetSelectedFunc(func(node *tview.TreeNode) {
-		cTui.tuiState.action = node.GetReference().(circleci.Action)
-		logs, _ := circleci.GetStepLogs(
-			cTui.config,
-			cTui.tuiState.job.JobNumber,
-			cTui.tuiState.action.Step,
-			cTui.tuiState.action.Index,
-			cTui.tuiState.action.AllocationId,
-		)
+	for {
+		go func() {
+			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.tuiState.job.JobNumber)
+			stepsChan <- jobDetails
+		}()
 
-		cTui.logs.updateLogsView(logs)
-		if cTui.logs.autoScroll {
-			cTui.logs.view.ScrollToEnd()
+		time.Sleep(refreshInterval)
+
+		select {
+		case <-cTui.steps.watchCtx.Done():
+			return
+
+		default:
+			jobDetails := <-stepsChan
+			cTui.app.QueueUpdateDraw(func() {
+				currentNode := cTui.steps.tree.GetCurrentNode().GetReference().(circleci.Action)
+				cTui.steps.clear()
+				cTui.steps.populateStepsTree(cTui.tuiState.job, jobDetails)
+				if cTui.steps.follow {
+					steps := cTui.steps.tree.GetRoot().GetChildren()
+					latestStepActions := steps[len(steps)-1].GetChildren()
+					for n := len(latestStepActions) - 1; n >= 0; n-- {
+						if n == 0 {
+							cTui.steps.tree.SetCurrentNode(latestStepActions[n])
+							cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
+							return
+						} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
+							cTui.steps.tree.SetCurrentNode(latestStepActions[n])
+							cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
+							return
+						}
+					}
+				}
+
+				for _, step := range cTui.steps.tree.GetRoot().GetChildren() {
+					for _, action := range step.GetChildren() {
+						node := action.GetReference().(circleci.Action)
+						if node.Step == currentNode.Step && node.Index == currentNode.Index {
+							cTui.steps.tree.SetCurrentNode(action)
+						}
+					}
+				}
+			})
 		}
-		
-		cTui.app.SetFocus(cTui.logs.view)
-	})
-
-	tree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEsc {
-			cTui.steps.refreshCancel()
-			tree.GetRoot().ClearChildren()
-			cTui.app.SetFocus(cTui.jobs.table)
-
-			return event
-		}
-
-		switch event.Rune() {
-		
-		case 'b':
-			cTui.app.SetFocus(cTui.branchSelect)
-
-
-		case 'd':
-			cTui.app.Stop()
-			fmt.Printf("circlog steps %s -j %d\n", cTui.config.Project, cTui.tuiState.job.JobNumber)
-		}
-		
-		return event
-	})
-
-	tree.SetFocusFunc(func() {
-		cTui.steps.refreshCancel()
-		cTui.controls.SetText(cTui.controlBindings)
-		cTui.steps.refreshCtx, cTui.steps.refreshCancel = context.WithCancel(context.TODO())
-		go cTui.refreshStepsTree(cTui.steps.refreshCtx)
-	})
-
-	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
-
-	return stepsTree{
-		tree: tree,
-		refreshCtx: refreshCtx,
-		refreshCancel: refreshCancel,
 	}
 }
 
-func (s stepsTree) populateStepsTree(job circleci.Job, jobDetails circleci.JobDetails) {
+func (s stepsPane) restartWatcher(cTui *CirclogTui, fn func()) {
+	cTui.steps.watchCancel()
+	fn()
+	cTui.steps.watchCtx, cTui.steps.watchCancel = context.WithCancel(context.TODO())
+	go cTui.steps.watchSteps(cTui)
+}
+
+func (s stepsPane) populateStepsTree(job circleci.Job, jobDetails circleci.JobDetails) {
 	jobNode := tview.NewTreeNode(job.Name)
 
 	s.tree.SetRoot(jobNode).
@@ -119,9 +115,8 @@ func (s stepsTree) populateStepsTree(job circleci.Job, jobDetails circleci.JobDe
 
 }
 
-func (s stepsTree) clear() {
+func (s stepsPane) clear() {
 	stepNodes := s.tree.GetRowCount()
-	s.tree.GetRoot()
 	if stepNodes > 0 {
 		s.tree.GetRoot().ClearChildren()
 	}

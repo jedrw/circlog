@@ -2,101 +2,62 @@ package tui
 
 import (
 	"context"
-	"fmt"
+	"time"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/lupinelab/circlog/circleci"
 	"github.com/rivo/tview"
 )
 
-type logsView struct {
-	view          *tview.TextView
-	autoScroll    bool
-	refreshCtx    context.Context
-	refreshCancel context.CancelFunc
+type logsPane struct {
+	view        *tview.TextView
+	autoScroll  bool
+	watchCtx    context.Context
+	watchCancel context.CancelFunc
 }
 
-func (cTui *CirclogTui) newLogsView() logsView {
-	view := tview.NewTextView()
-	view.SetTitle(" LOGS - Autoscroll Enabled ")
-	view.SetBorder(true).SetBorderPadding(0, 0, 1, 1)
-	view.SetDynamicColors(true)
+func (l logsPane) watchLogs(cTui *CirclogTui) {
+	logsChan := make(chan string)
 
-	view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Key() {
-		
-		case tcell.KeyEsc:
-			cTui.logs.refreshCancel()
-			view.Clear()
-			cTui.app.SetFocus(cTui.steps.tree)
-
-			return event
-
-		case tcell.KeyUp:
-			cTui.logs.refreshCancel()
-			cTui.logs.autoScroll = false
-			view.SetTitle(" LOGS - Autoscroll Disabled	 ")
-			cTui.logs.refreshCtx, cTui.logs.refreshCancel = context.WithCancel(context.TODO())
-			go cTui.refreshLogsView(cTui.logs.refreshCtx)
-
-			return event
-		}
-
-		switch event.Rune() {
-		
-		case 'a':
-			cTui.logs.refreshCancel()
-			cTui.logs.autoScroll = !cTui.logs.autoScroll
-			if cTui.logs.autoScroll {
-				view.SetTitle(" LOGS - Autoscroll Enabled ")
-				view.ScrollToEnd()
-			} else {
-				view.SetTitle(" LOGS - Autoscroll Disabled	 ")
-			}
-			cTui.logs.refreshCtx, cTui.logs.refreshCancel = context.WithCancel(context.TODO())
-			go cTui.refreshLogsView(cTui.logs.refreshCtx)
-
-		case 'b':
-			cTui.app.SetFocus(cTui.branchSelect)
-
-		case 'd':
-			cTui.app.Stop()
-			fmt.Printf("circlog logs %s -j %d -s %d -i %d -a \"%s\"\n",
-				cTui.config.Project,
+	for {
+		go func() {
+			logs, _ := circleci.GetStepLogs(
+				cTui.config,
 				cTui.tuiState.job.JobNumber,
 				cTui.tuiState.action.Step,
 				cTui.tuiState.action.Index,
 				cTui.tuiState.action.AllocationId,
 			)
+
+			logsChan <- logs
+		}()
+
+		select {
+		case <-cTui.logs.watchCtx.Done():
+			return
+
+		case logs := <-logsChan:
+			cTui.app.QueueUpdateDraw(func() {
+				row, col := cTui.logs.view.GetScrollOffset()
+				cTui.logs.updateLogsView(logs)
+				if cTui.logs.autoScroll {
+					cTui.logs.view.ScrollToEnd()
+				} else {
+					cTui.logs.view.ScrollTo(row, col)
+				}
+			})
 		}
 
-		return event
-	})
-
-	logsControlBindings := `Move	           [Up/Down]
-		Select               [Enter]
-		Toggle Autoscroll        [A]
-		Select branch            [B]
-		Dump command             [D]
-		Back/Quit              [Esc]
-	`
-
-	view.SetFocusFunc(func() {
-		cTui.logs.refreshCancel()
-		cTui.controls.SetText(logsControlBindings)
-		cTui.logs.refreshCtx, cTui.logs.refreshCancel = context.WithCancel(context.TODO())
-		go cTui.refreshLogsView(cTui.logs.refreshCtx)
-	})
-
-	refreshCtx, refreshCancel := context.WithCancel(context.TODO())
-
-	return logsView{
-		view:          view,
-		autoScroll:    true,
-		refreshCtx:    refreshCtx,
-		refreshCancel: refreshCancel,
+		time.Sleep(refreshInterval)
 	}
 }
 
-func (l logsView) updateLogsView(logs string) {
+func (l logsPane) restartWatcher(cTui *CirclogTui, fn func()) {
+	cTui.logs.watchCancel()
+	fn()
+	cTui.logs.watchCtx, cTui.logs.watchCancel = context.WithCancel(context.TODO())
+	go cTui.logs.watchLogs(cTui)
+}
+
+func (l logsPane) updateLogsView(logs string) {
 	l.view.SetText(tview.TranslateANSI(logs))
 }

@@ -11,7 +11,6 @@ func (cTui *CirclogTui) initProjectSelect() {
 	cTui.projectSelect.SetLabelColor(tcell.ColorDefault)
 
 	cTui.projectSelect.SetLabel("Project: ").SetDoneFunc(func(key tcell.Key) {
-		cTui.clearAll()
 		cTui.config.Project = cTui.projectSelect.GetText()
 		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
 		cTui.pipelines.populateTable(pipelines, nextPageToken)
