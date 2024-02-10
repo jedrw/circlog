@@ -386,7 +386,7 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 
 func (cTui *CirclogTui) newStepsPane() stepsPane {
 	tree := tview.NewTreeView()
-	tree.SetTitle(" STEPS - Follow Enabled [F[] ")
+	tree.SetTitle(" STEPS - Follow Disabled ")
 	tree.SetBorder(true)
 
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
@@ -464,7 +464,7 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 
 		return event
 	})
-
+	
 	tree.SetFocusFunc(func() {
 		cTui.steps.restartWatcher(cTui, func() {
 			cTui.paneControls.SetText(`Toggle Follow            [F]`)
@@ -474,8 +474,10 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 				for n := len(latestStepActions) - 1; n >= 0; n-- {
 					if n == 0 {
 						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
+						cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
 					} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
 						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
+						cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
 					}
 				}
 			}
@@ -486,7 +488,7 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 
 	return stepsPane{
 		tree:        tree,
-		follow:      true,
+		follow:      false,
 		watchCtx:    watchCtx,
 		watchCancel: watchCancel,
 	}
