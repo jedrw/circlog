@@ -129,7 +129,9 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 
 func (s *stepsPane) watchSteps(ctx context.Context, cTui *CirclogTui) {
 	stepsChan := make(chan circleci.JobDetails)
+	ticker := time.NewTicker(refreshInterval)
 
+LOOP:
 	for {
 		go func() {
 			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.state.job.JobNumber)
@@ -138,10 +140,10 @@ func (s *stepsPane) watchSteps(ctx context.Context, cTui *CirclogTui) {
 
 		select {
 		case <-ctx.Done():
-			return
+			ticker.Stop()
+			break LOOP
 
-		default:
-			time.Sleep(refreshInterval)
+		case <-ticker.C:
 			jobDetails := <-stepsChan
 			cTui.app.QueueUpdateDraw(func() {
 				if s.tree.GetRoot().GetChildren()[0].GetText() != "None" {

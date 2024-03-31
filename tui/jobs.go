@@ -94,7 +94,9 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 func (j *jobsPane) watchJobs(ctx context.Context, cTui *CirclogTui) {
 	jobsChan := make(chan []circleci.Job)
 	nextPageTokenChan := make(chan string)
+	ticker := time.NewTicker(refreshInterval)
 
+LOOP:
 	for {
 		go func() {
 			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.state.workflow.Id, cTui.workflows.numPages, "")
@@ -104,10 +106,10 @@ func (j *jobsPane) watchJobs(ctx context.Context, cTui *CirclogTui) {
 
 		select {
 		case <-ctx.Done():
-			return
+			ticker.Stop()
+			break LOOP
 
-		default:
-			time.Sleep(refreshInterval)
+		case <-ticker.C:
 			jobs := <-jobsChan
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
