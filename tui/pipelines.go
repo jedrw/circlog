@@ -113,7 +113,9 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 func (p *pipelinesPane) watchPipelines(ctx context.Context, cTui *CirclogTui) {
 	pipelinesChan := make(chan []circleci.Pipeline)
 	nextPageTokenChan := make(chan string)
+	ticker := time.NewTicker(refreshInterval)
 
+LOOP:
 	for {
 		go func() {
 			pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, p.numPages, "")
@@ -123,10 +125,10 @@ func (p *pipelinesPane) watchPipelines(ctx context.Context, cTui *CirclogTui) {
 
 		select {
 		case <-ctx.Done():
-			return
+			ticker.Stop()
+			break LOOP
 
-		default:
-			time.Sleep(refreshInterval)
+		case <-ticker.C:
 			pipelines := <-pipelinesChan
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {

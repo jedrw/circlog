@@ -93,7 +93,9 @@ func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
 func (w *workflowsPane) watchWorkflows(ctx context.Context, cTui *CirclogTui) {
 	workflowsChan := make(chan []circleci.Workflow)
 	nextPageTokenChan := make(chan string)
+	ticker := time.NewTicker(refreshInterval)
 
+LOOP:
 	for {
 		go func() {
 			workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.state.pipeline.Id, cTui.pipelines.numPages, "")
@@ -103,10 +105,10 @@ func (w *workflowsPane) watchWorkflows(ctx context.Context, cTui *CirclogTui) {
 
 		select {
 		case <-ctx.Done():
-			return
+			ticker.Stop()
+			break LOOP
 
-		default:
-			time.Sleep(refreshInterval)
+		case <-ticker.C:
 			workflows := <-workflowsChan
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {

@@ -134,7 +134,9 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 
 func (l *logsPane) watchLogs(ctx context.Context, cTui *CirclogTui) {
 	logsChan := make(chan string)
+	ticker := time.NewTicker(refreshInterval)
 
+LOOP:
 	for {
 		go func() {
 			logs, _ := circleci.GetStepLogs(
@@ -150,10 +152,11 @@ func (l *logsPane) watchLogs(ctx context.Context, cTui *CirclogTui) {
 
 		select {
 		case <-ctx.Done():
-			return
+			ticker.Stop()
+			break LOOP
 
-		case logs := <-logsChan:
-			time.Sleep(refreshInterval)
+		case <-ticker.C:
+			logs := <-logsChan
 			cTui.app.QueueUpdateDraw(func() {
 				row, col := l.view.GetScrollOffset()
 				l.updateLogsView(logs)
