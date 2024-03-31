@@ -21,7 +21,7 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 	tree := tview.NewTreeView()
 	tree.SetTitle(" STEPS - Follow Disabled ")
 	tree.SetBorder(true)
-
+	tree.SetBorderColor(tcell.ColorGrey)
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		cTui.logs.restartWatcher(cTui, func() {
 			cTui.steps.restartWatcher(cTui, func() {
@@ -52,6 +52,7 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 			cTui.steps.watchCancel()
 			cTui.logs.view.Clear()
 			cTui.steps.clear()
+			tree.SetBorderColor(tcell.ColorGrey)
 			cTui.app.SetFocus(cTui.jobs.table)
 
 			return event
@@ -100,6 +101,7 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 
 	tree.SetFocusFunc(func() {
 		cTui.steps.restartWatcher(cTui, func() {
+			tree.SetBorderColor(tcell.ColorDefault)
 			cTui.paneControls.SetText(`Toggle Follow            [F]`)
 			if cTui.steps.follow {
 				steps := cTui.steps.tree.GetRoot().GetChildren()

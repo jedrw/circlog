@@ -21,14 +21,15 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 	view := tview.NewTextView()
 	view.SetTitle(" LOGS - Autoscroll Enabled ")
 	view.SetBorder(true).SetBorderPadding(0, 0, 1, 1)
+	view.SetBorderColor(tcell.ColorGrey)
 	view.SetDynamicColors(true)
-
 	view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 
 		case tcell.KeyEsc:
 			cTui.logs.watchCancel()
-			cTui.logs.view.Clear()
+			view.Clear()
+			view.SetBorderColor(tcell.ColorGrey)
 			if cTui.steps.follow {
 				cTui.steps.restartWatcher(cTui, func() {
 					cTui.steps.follow = !cTui.steps.follow
@@ -118,6 +119,7 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 
 	view.SetFocusFunc(func() {
 		cTui.logs.restartWatcher(cTui, func() {
+			view.SetBorderColor(tcell.ColorDefault)
 			cTui.paneControls.SetText(`Toggle Autoscroll        [A]`)
 		})
 	})

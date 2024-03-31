@@ -21,6 +21,7 @@ func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
 	table := tview.NewTable()
 	table.SetTitle(" WORKFLOWS ")
 	table.SetBorder(true)
+	table.SetBorderColor(tcell.ColorGrey)
 	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 
 	for column, header := range []string{"Name", "Duration"} {
@@ -54,6 +55,7 @@ func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
 		if event.Key() == tcell.KeyEsc {
 			cTui.workflows.watchCancel()
 			cTui.workflows.clear()
+			table.SetBorderColor(tcell.ColorGrey)
 			cTui.app.SetFocus(cTui.pipelines.table)
 
 			return event
@@ -76,6 +78,7 @@ func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
 
 	table.SetFocusFunc(func() {
 		cTui.workflows.restartWatcher(cTui, func() {
+			table.SetBorderColor(tcell.ColorDefault)
 			cTui.paneControls.Clear()
 		})
 	})

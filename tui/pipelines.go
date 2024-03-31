@@ -21,6 +21,7 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 	table := tview.NewTable()
 	table.SetTitle(" PIPELINES ")
 	table.SetBorder(true)
+	table.SetBorderColor(tcell.ColorGrey)
 	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
 
 	for column, header := range []string{"Number", "Branch/Tag", "Start", "Trigger"} {
@@ -53,6 +54,7 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
 			cTui.clearAll()
+			table.SetBorderColor(tcell.ColorGrey)
 			cTui.config.Project = ""
 			cTui.config.Branch = ""
 			cTui.app.SetFocus(cTui.projectSelect)
@@ -82,6 +84,7 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 
 		case 'b':
 			cTui.clearAll()
+			table.SetBorderColor(tcell.ColorGrey)
 			cTui.config.Branch = ""
 			cTui.app.SetFocus(cTui.branchSelect)
 
@@ -96,6 +99,7 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 
 	table.SetFocusFunc(func() {
 		cTui.pipelines.restartWatcher(cTui, func() {
+			table.SetBorderColor(tcell.ColorDefault)
 			cTui.paneControls.SetText(`Filter by branch         [V]`)
 		})
 	})
