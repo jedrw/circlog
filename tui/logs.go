@@ -28,16 +28,17 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 
 		case tcell.KeyEsc:
 			cTui.logs.watchCancel()
-			view.Clear()
-			view.SetBorderColor(tcell.ColorGrey)
-			if cTui.steps.follow {
-				cTui.steps.restartWatcher(cTui, func() {
-					cTui.steps.follow = !cTui.steps.follow
+			cTui.steps.restartWatcher(cTui, func() {
+				if cTui.steps.follow {
+					cTui.steps.follow = false
 					cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-				})
-			}
+				}
 
-			cTui.app.SetFocus(cTui.steps.tree)
+				view.Clear()
+				view.SetBorderColor(tcell.ColorGrey)
+
+				cTui.app.SetFocus(cTui.steps.tree)
+			})
 
 			return event
 
@@ -57,31 +58,7 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 		switch event.Rune() {
 
 		case 'f':
-			cTui.logs.restartWatcher(cTui, func() {
-				cTui.logs.autoScroll = true
-				cTui.logs.view.SetTitle(" LOGS - Autoscroll Enabled ")
-				cTui.steps.restartWatcher(cTui, func() {
-					cTui.steps.follow = !cTui.steps.follow
-					if cTui.steps.follow {
-						cTui.steps.tree.SetTitle(" STEPS - Follow Enabled ")
-						steps := cTui.steps.tree.GetRoot().GetChildren()
-						latestStepActions := steps[len(steps)-1].GetChildren()
-						for n := len(latestStepActions) - 1; n >= 0; n-- {
-							if n == 0 {
-								cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-								cTui.app.SetFocus(cTui.steps.tree)
-								cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
-							} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
-								cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-								cTui.app.SetFocus(cTui.steps.tree)
-								cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
-							}
-						}
-					} else {
-						cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-					}
-				})
-			})
+			toggleFollow(cTui)
 
 		case 'a':
 			cTui.logs.restartWatcher(cTui, func() {
@@ -157,8 +134,7 @@ LOOP:
 			ticker.Stop()
 			break LOOP
 
-		case <-ticker.C:
-			logs := <-logsChan
+		case logs := <-logsChan:
 			cTui.app.QueueUpdateDraw(func() {
 				row, col := l.view.GetScrollOffset()
 				l.updateLogsView(logs)
@@ -168,8 +144,11 @@ LOOP:
 					l.view.ScrollTo(row, col)
 				}
 			})
+
+			<-ticker.C
 		}
 	}
+
 }
 
 func (l *logsPane) restartWatcher(cTui *CirclogTui, fn func()) {

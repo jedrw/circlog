@@ -112,13 +112,14 @@ LOOP:
 			ticker.Stop()
 			break LOOP
 
-		case <-ticker.C:
-			jobs := <-jobsChan
+		case jobs := <-jobsChan:
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
 				j.clear()
 				j.addJobsToTable(jobs, 1, nextPageToken)
 			})
+
+			<-ticker.C
 		}
 	}
 }
