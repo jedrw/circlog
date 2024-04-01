@@ -111,13 +111,14 @@ LOOP:
 			ticker.Stop()
 			break LOOP
 
-		case <-ticker.C:
-			workflows := <-workflowsChan
+		case workflows := <-workflowsChan:
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
 				w.clear()
 				w.addWorkflowsToTable(workflows, nextPageToken)
 			})
+
+			<-ticker.C
 		}
 	}
 }

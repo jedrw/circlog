@@ -132,13 +132,14 @@ LOOP:
 			ticker.Stop()
 			break LOOP
 
-		case <-ticker.C:
-			pipelines := <-pipelinesChan
+		case pipelines := <-pipelinesChan:
 			nextPageToken := <-nextPageTokenChan
 			cTui.app.QueueUpdateDraw(func() {
 				p.clear()
 				p.addPipelinesToTable(pipelines, 1, nextPageToken)
 			})
+
+			<-ticker.C
 		}
 	}
 }

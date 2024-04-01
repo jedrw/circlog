@@ -29,10 +29,6 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 			})
 		})
 
-		if cTui.logs.autoScroll {
-			cTui.logs.view.ScrollToEnd()
-		}
-
 		cTui.app.SetFocus(cTui.logs.view)
 	})
 
@@ -62,29 +58,8 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 		switch event.Rune() {
 
 		case 'f':
-			cTui.logs.restartWatcher(cTui, func() {
-				cTui.steps.restartWatcher(cTui, func() {
-					cTui.steps.follow = !cTui.steps.follow
-					if cTui.steps.follow {
-						cTui.logs.autoScroll = true
-						cTui.steps.tree.SetTitle(" STEPS - Follow Enabled ")
-						cTui.logs.view.SetTitle(" LOGS - Autoscroll Enabled ")
-						steps := tree.GetRoot().GetChildren()
-						latestStepActions := steps[len(steps)-1].GetChildren()
-						for n := len(latestStepActions) - 1; n >= 0; n-- {
-							if n == 0 {
-								cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-								cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
-							} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
-								cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-								cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
-							}
-						}
-					} else {
-						cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-					}
-				})
-			})
+			toggleFollow(cTui)
+			cTui.app.SetFocus(cTui.logs.view)
 
 		case 'b':
 			cTui.clearAll()
@@ -103,19 +78,6 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 		cTui.steps.restartWatcher(cTui, func() {
 			tree.SetBorderColor(tcell.ColorDefault)
 			cTui.paneControls.SetText(`Toggle Follow            [F]`)
-			if cTui.steps.follow {
-				steps := cTui.steps.tree.GetRoot().GetChildren()
-				latestStepActions := steps[len(steps)-1].GetChildren()
-				for n := len(latestStepActions) - 1; n >= 0; n-- {
-					if n == 0 {
-						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-						cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
-					} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
-						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-						cTui.app.QueueEvent(tcell.NewEventKey(tcell.KeyEnter, 13, 0))
-					}
-				}
-			}
 		})
 	})
 
@@ -135,51 +97,54 @@ func (s *stepsPane) watchSteps(ctx context.Context, cTui *CirclogTui) {
 
 LOOP:
 	for {
-		go func() {
-			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.state.job.JobNumber)
-			stepsChan <- jobDetails
-		}()
+		if cTui.state.action != (circleci.Action{}) {
+			go func() {
+				jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.state.job.JobNumber)
+				stepsChan <- jobDetails
+			}()
 
-		select {
-		case <-ctx.Done():
-			ticker.Stop()
-			break LOOP
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				break LOOP
 
-		case <-ticker.C:
-			jobDetails := <-stepsChan
-			cTui.app.QueueUpdateDraw(func() {
-				if s.tree.GetRoot().GetChildren()[0].GetText() != "None" {
-					currentNode := s.tree.GetCurrentNode().GetReference().(circleci.Action)
-					s.clear()
-					s.populateStepsTree(cTui.state.job, jobDetails)
-					if s.follow {
-						steps := s.tree.GetRoot().GetChildren()
-						latestStepActions := steps[len(steps)-1].GetChildren()
-						for n := len(latestStepActions) - 1; n >= 0; n-- {
-							if n == 0 {
-								cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
-								s.tree.SetCurrentNode(latestStepActions[n])
-								cTui.logs.restartWatcher(cTui, func() {})
-								return
-							} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
-								cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
-								s.tree.SetCurrentNode(latestStepActions[n])
-								cTui.logs.restartWatcher(cTui, func() {})
-								return
+			case jobDetails := <-stepsChan:
+				cTui.app.QueueUpdateDraw(func() {
+					if s.tree.GetRoot().GetChildren()[0].GetText() != "None" {
+						currentNode := s.tree.GetCurrentNode().GetReference().(circleci.Action)
+						s.clear()
+						s.populateStepsTree(cTui.state.job, jobDetails)
+						if s.follow {
+							steps := s.tree.GetRoot().GetChildren()
+							latestStepActions := steps[len(steps)-1].GetChildren()
+							for n := len(latestStepActions) - 1; n >= 0; n-- {
+								if n == 0 {
+									s.tree.SetCurrentNode(latestStepActions[n])
+									cTui.logs.restartWatcher(cTui, func() {
+										cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
+									})
+								} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
+									s.tree.SetCurrentNode(latestStepActions[n])
+									cTui.logs.restartWatcher(cTui, func() {
+										cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
+									})
+								}
+							}
+						} else {
+							for _, step := range s.tree.GetRoot().GetChildren() {
+								for _, action := range step.GetChildren() {
+									node := action.GetReference().(circleci.Action)
+									if node.Step == currentNode.Step && node.Index == currentNode.Index {
+										s.tree.SetCurrentNode(action)
+									}
+								}
 							}
 						}
 					}
+				})
 
-					for _, step := range s.tree.GetRoot().GetChildren() {
-						for _, action := range step.GetChildren() {
-							node := action.GetReference().(circleci.Action)
-							if node.Step == currentNode.Step && node.Index == currentNode.Index {
-								s.tree.SetCurrentNode(action)
-							}
-						}
-					}
-				}
-			})
+				<-ticker.C
+			}
 		}
 	}
 }
