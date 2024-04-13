@@ -13,6 +13,7 @@ import (
 type pipelinesPane struct {
 	table       *tview.Table
 	numPages    int
+	update      chan bool
 	watchCtx    context.Context
 	watchCancel context.CancelFunc
 }
@@ -34,26 +35,21 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 		switch cellRef := cellRef.(type) {
 
 		case circleci.Pipeline:
-			cTui.state.pipeline = cellRef
-			workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.state.pipeline.Id, 1, "")
-			cTui.workflows.populateWorkflowsTable(workflows, nextPageToken)
+			cTui.updateState <- cellRef
+			cTui.workflows.update <- true
 			cTui.app.SetFocus(cTui.workflows.table)
 
 		case string:
 			if cell.Text == "..." {
-				cTui.pipelines.restartWatcher(cTui, func() {
-					nextPageToken := cell.GetReference().(string)
-					newPipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, nextPageToken)
-					cTui.pipelines.addPipelinesToTable(newPipelines, table.GetRowCount()-1, nextPageToken)
-					cTui.pipelines.numPages++
-				})
+				cTui.pipelines.numPages++
+				cTui.pipelines.update <- true
 			}
 		}
 	})
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			cTui.clearAll()
+			cTui.watchCancelAll()
 			table.SetBorderColor(tcell.ColorGrey)
 			cTui.config.Project = ""
 			cTui.config.Branch = ""
@@ -70,23 +66,23 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 			switch cellRef := cellRef.(type) {
 			case circleci.Pipeline:
 				if cellRef.Vcs.Branch != "" {
-					cTui.pipelines.restartWatcher(cTui, func() {
+					cTui.pipelines.restartWatcher(func() {
 						cTui.pipelines.clear()
 						cTui.pipelines.numPages = 1
 						cTui.config.Branch = cellRef.Vcs.Branch
 						cTui.branchSelect.SetText(cTui.config.Branch)
-						pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
-						cTui.pipelines.populateTable(pipelines, nextPageToken)
-						cTui.pipelines.table.ScrollToBeginning()
+						cTui.pipelines.update <- true
 					})
 				}
 			}
 
 		case 'b':
-			cTui.clearAll()
-			table.SetBorderColor(tcell.ColorGrey)
-			cTui.config.Branch = ""
-			cTui.app.SetFocus(cTui.branchSelect)
+			cTui.pipelines.restartWatcher(func() {
+				cTui.clearAll()
+				table.SetBorderColor(tcell.ColorGrey)
+				cTui.config.Branch = ""
+				cTui.app.SetFocus(cTui.branchSelect)
+			})
 
 		case 'd':
 			cTui.watchCancelAll()
@@ -98,77 +94,90 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 	})
 
 	table.SetFocusFunc(func() {
-		cTui.pipelines.restartWatcher(cTui, func() {
+		cTui.pipelines.restartWatcher(func() {
 			table.SetBorderColor(tcell.ColorDefault)
-			cTui.paneControls.SetText(`Filter by branch         [V]`)
+			cTui.paneControls.SetText(`Branch Select            [B]
+			Filter by branch         [V]`)
 		})
 	})
 
 	watchCtx, watchCancel := context.WithCancel(context.Background())
-
-	return pipelinesPane{
+	pipelinesPane := pipelinesPane{
 		table:       table,
 		numPages:    1,
 		watchCtx:    watchCtx,
 		watchCancel: watchCancel,
 	}
+
+	pipelinesPane.update = pipelinesPane.updater(cTui)
+
+	return pipelinesPane
 }
 
-func (p *pipelinesPane) watchPipelines(ctx context.Context, cTui *CirclogTui) {
-	pipelinesChan := make(chan []circleci.Pipeline)
-	nextPageTokenChan := make(chan string)
+func (p *pipelinesPane) watchPipelines(ctx context.Context) {
 	ticker := time.NewTicker(refreshInterval)
 
 LOOP:
 	for {
-		go func() {
-			pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, p.numPages, "")
-			pipelinesChan <- pipelines
-			nextPageTokenChan <- nextPageToken
-		}()
-
 		select {
 		case <-ctx.Done():
 			ticker.Stop()
 			break LOOP
 
-		case pipelines := <-pipelinesChan:
-			nextPageToken := <-nextPageTokenChan
-			cTui.app.QueueUpdateDraw(func() {
-				p.clear()
-				p.addPipelinesToTable(pipelines, 1, nextPageToken)
-			})
-
-			<-ticker.C
+		case <-ticker.C:
+			p.update <- true
 		}
 	}
 }
 
-func (p *pipelinesPane) restartWatcher(cTui *CirclogTui, fn func()) {
+func (p *pipelinesPane) restartWatcher(fn func()) {
 	p.watchCancel()
 	fn()
 	p.watchCtx, p.watchCancel = context.WithCancel(context.TODO())
-	go p.watchPipelines(p.watchCtx, cTui)
+	go p.watchPipelines(p.watchCtx)
 }
 
-func (p *pipelinesPane) populateTable(pipelines []circleci.Pipeline, nextPageToken string) {
-	p.clear()
-	p.addPipelinesToTable(pipelines, p.table.GetRowCount(), nextPageToken)
+func (p *pipelinesPane) updater(cTui *CirclogTui) chan bool {
+	updateChan := make(chan bool)
+
+	go func() {
+		for <-updateChan {
+			pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, cTui.pipelines.numPages, "")
+			cTui.app.QueueUpdateDraw(func() {
+				cTui.pipelines.restartWatcher(func() {
+					currentRow := 1
+					if p.table.GetRowCount() != 1 {
+						currentRow, _ = p.table.GetSelection()
+					}
+
+					p.clear()
+					p.populatePipelinesTable(pipelines, nextPageToken)
+
+					if currentRow == 1 {
+						p.table.ScrollToBeginning()
+					} else {
+						p.table.Select(currentRow, 0)
+					}
+				})
+			})
+		}
+	}()
+
+	return updateChan
 }
 
-func (p *pipelinesPane) addPipelinesToTable(pipelines []circleci.Pipeline, startRow int, nextPageToken string) {
+func (p *pipelinesPane) populatePipelinesTable(pipelines []circleci.Pipeline, nextPageToken string) {
 	if len(pipelines) != 0 {
 		for row, pipeline := range pipelines {
 			for column, attr := range []string{fmt.Sprint(pipeline.Number), branchOrTag(pipeline), pipeline.CreatedAt.Local().Format(time.RFC822Z), pipeline.Trigger.Type} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(pipeline.State))
 				cell.SetReference(pipeline)
-				p.table.SetCell(row+startRow, column, cell)
+				p.table.SetCell(row+1, column, cell)
 			}
 		}
 
 		if nextPageToken != "" {
-			cell := tview.NewTableCell("...")
-			cell.SetReference(nextPageToken)
+			cell := tview.NewTableCell("...").SetReference("...")
 			p.table.SetCell(p.table.GetRowCount(), 0, cell)
 		}
 

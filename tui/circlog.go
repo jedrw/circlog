@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -10,6 +11,9 @@ import (
 	"github.com/rivo/tview"
 )
 
+type StateComponent interface {
+}
+
 type tuiState struct {
 	pipeline circleci.Pipeline
 	workflow circleci.Workflow
@@ -17,11 +21,40 @@ type tuiState struct {
 	action   circleci.Action
 }
 
+func (s *tuiState) updater() chan StateComponent {
+	updateChan := make(chan StateComponent)
+
+	go func() {
+		for update := range updateChan {
+			switch component := update.(type) {
+
+			case circleci.Pipeline:
+				s.pipeline = component
+
+			case circleci.Workflow:
+				s.workflow = component
+
+			case circleci.Job:
+				s.job = component
+
+			case circleci.Action:
+				s.action = component
+
+			default:
+				log.Fatalf("unexpected state type: %T", component)
+			}
+		}
+	}()
+
+	return updateChan
+}
+
 type CirclogTui struct {
 	app *tview.Application
 
-	config config.CirclogConfig
-	state  tuiState
+	config      config.CirclogConfig
+	state       tuiState
+	updateState chan StateComponent
 
 	layout   *tview.Flex
 	heading  *tview.Flex
@@ -89,9 +122,10 @@ func (cTui *CirclogTui) Run() error {
 	cTui.logs = cTui.newLogsPane()
 	cTui.lowerNav.AddItem(cTui.logs.view, 0, 2, false)
 
+	cTui.updateState = cTui.state.updater()
+
 	if cTui.config.Project != "" {
-		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
-		cTui.pipelines.populateTable(pipelines, nextPageToken)
+		cTui.pipelines.update <- true
 		cTui.app.SetRoot(cTui.layout, true).SetFocus(cTui.pipelines.table)
 	} else {
 		cTui.app.SetRoot(cTui.layout, true).SetFocus(cTui.info)
@@ -132,7 +166,6 @@ func (cTui *CirclogTui) initNavLayout() {
 	cTui.globalControls.SetText(`Move	           [Up/Down]
 	Select               [Enter]
 	Dump command             [D]
-	Branch Select            [B]
 	Back/Quit              [Esc]
 	`)
 	cTui.heading.AddItem(cTui.globalControls, 0, 1, false)
@@ -142,31 +175,4 @@ func (cTui *CirclogTui) initNavLayout() {
 
 	cTui.lowerNav = tview.NewFlex().SetDirection(tview.FlexColumn)
 	cTui.layout.AddItem(cTui.lowerNav, 0, 3, false)
-}
-
-func toggleFollow(cTui *CirclogTui) {
-	cTui.logs.restartWatcher(cTui, func() {
-		cTui.steps.restartWatcher(cTui, func() {
-			if !cTui.steps.follow {
-				cTui.steps.follow = true
-				cTui.logs.autoScroll = true
-				cTui.steps.tree.SetTitle(" STEPS - Follow Enabled ")
-				cTui.logs.view.SetTitle(" LOGS - Autoscroll Enabled ")
-				steps := cTui.steps.tree.GetRoot().GetChildren()
-				latestStepActions := steps[len(steps)-1].GetChildren()
-				for n := len(latestStepActions) - 1; n >= 0; n-- {
-					if n == 0 {
-						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-						cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
-					} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
-						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-						cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
-					}
-				}
-			} else {
-				cTui.steps.follow = false
-				cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-			}
-		})
-	})
 }

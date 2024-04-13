@@ -33,9 +33,9 @@ func (cTui *CirclogTui) clearAll() {
 }
 
 func (cTui *CirclogTui) watchCancelAll() {
-	cTui.logs.watchCancel()
-	cTui.steps.watchCancel()
-	cTui.jobs.watchCancel()
-	cTui.workflows.watchCancel()
 	cTui.pipelines.watchCancel()
+	cTui.updateState <- circleci.Action{}
+	cTui.updateState <- circleci.Job{}
+	cTui.updateState <- circleci.Workflow{}
+	cTui.updateState <- circleci.Pipeline{}
 }

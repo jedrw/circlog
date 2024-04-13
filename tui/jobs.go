@@ -14,6 +14,7 @@ import (
 type jobsPane struct {
 	table       *tview.Table
 	numPages    int
+	update      chan bool
 	watchCtx    context.Context
 	watchCancel context.CancelFunc
 }
@@ -35,19 +36,15 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 		switch cellRef := cellRef.(type) {
 
 		case circleci.Job:
-			cTui.state.job = cellRef
-			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.state.job.JobNumber)
-			cTui.steps.populateStepsTree(cTui.state.job, jobDetails)
+			cTui.updateState <- cellRef
+			jobDetails, _ := circleci.GetJobSteps(cTui.config, cellRef.JobNumber)
+			cTui.steps.populateStepsTree(cellRef, jobDetails)
 			cTui.app.SetFocus(cTui.steps.tree)
 
 		case string:
 			if cell.Text == "..." {
-				cTui.jobs.restartWatcher(cTui, func() {
-					nextPageToken := cell.GetReference().(string)
-					newJobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.state.workflow.Id, 1, nextPageToken)
-					cTui.jobs.addJobsToTable(newJobs, table.GetRowCount()-1, nextPageToken)
-					cTui.jobs.numPages++
-				})
+				cTui.jobs.numPages++
+				cTui.jobs.update <- true
 			}
 		}
 	})
@@ -64,11 +61,6 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 
 		switch event.Rune() {
 
-		case 'b':
-			cTui.clearAll()
-			cTui.config.Branch = ""
-			cTui.app.SetFocus(cTui.branchSelect)
-
 		case 'd':
 			cTui.app.Stop()
 			fmt.Printf("circlog jobs %s -w %s\n", cTui.config.Project, cTui.state.workflow.Id)
@@ -78,7 +70,7 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 	})
 
 	table.SetFocusFunc(func() {
-		cTui.jobs.restartWatcher(cTui, func() {
+		cTui.jobs.restartWatcher(func() {
 			table.SetBorderColor(tcell.ColorDefault)
 			cTui.paneControls.Clear()
 		})
@@ -86,58 +78,70 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 
 	watchCtx, watchCancel := context.WithCancel(context.Background())
 
-	return jobsPane{
+	jobsPane := jobsPane{
 		table:       table,
 		numPages:    1,
 		watchCtx:    watchCtx,
 		watchCancel: watchCancel,
 	}
+
+	jobsPane.update = jobsPane.updater(cTui)
+
+	return jobsPane
 }
 
-func (j *jobsPane) watchJobs(ctx context.Context, cTui *CirclogTui) {
-	jobsChan := make(chan []circleci.Job)
-	nextPageTokenChan := make(chan string)
+func (j *jobsPane) watchJobs(ctx context.Context) {
 	ticker := time.NewTicker(refreshInterval)
 
 LOOP:
 	for {
-		go func() {
-			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.state.workflow.Id, cTui.workflows.numPages, "")
-			jobsChan <- jobs
-			nextPageTokenChan <- nextPageToken
-		}()
-
 		select {
 		case <-ctx.Done():
 			ticker.Stop()
 			break LOOP
 
-		case jobs := <-jobsChan:
-			nextPageToken := <-nextPageTokenChan
-			cTui.app.QueueUpdateDraw(func() {
-				j.clear()
-				j.addJobsToTable(jobs, 1, nextPageToken)
-			})
-
-			<-ticker.C
+		case <-ticker.C:
+			j.update <- true
 		}
 	}
 }
 
-func (j *jobsPane) restartWatcher(cTui *CirclogTui, fn func()) {
+func (j *jobsPane) restartWatcher(fn func()) {
 	j.watchCancel()
 	fn()
 	j.watchCtx, j.watchCancel = context.WithCancel(context.TODO())
-	go j.watchJobs(j.watchCtx, cTui)
+	go j.watchJobs(j.watchCtx)
 }
 
-func (j *jobsPane) populateTable(jobs []circleci.Job, nextPageToken string) {
-	j.clear()
-	j.addJobsToTable(jobs, j.table.GetRowCount(), nextPageToken)
+func (j *jobsPane) updater(cTui *CirclogTui) chan bool {
+	updateChan := make(chan bool)
+
+	go func() {
+		for <-updateChan {
+			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.state.workflow.Id, j.numPages, "")
+			cTui.app.QueueUpdateDraw(func() {
+				currentRow := 1
+				if j.table.GetRowCount() != 1 {
+					currentRow, _ = j.table.GetSelection()
+				}
+
+				j.clear()
+				j.populateJobsTable(jobs, j.table.GetRowCount(), nextPageToken)
+
+				if currentRow == 1 {
+					j.table.ScrollToBeginning()
+				} else {
+					j.table.Select(currentRow, 0)
+				}
+			})
+		}
+	}()
+
+	return updateChan
 
 }
 
-func (j *jobsPane) addJobsToTable(jobs []circleci.Job, startRow int, nextPageToken string) {
+func (j *jobsPane) populateJobsTable(jobs []circleci.Job, startRow int, nextPageToken string) {
 	if len(jobs) != 0 {
 		for row, job := range jobs {
 			dependencies := getNamedJobDependencies(job, jobs)

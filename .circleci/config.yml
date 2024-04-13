@@ -3,7 +3,7 @@ version: 2.1
 jobs: 
   test_build:
     docker: 
-      - image: cimg/go:1.21
+      - image: cimg/go:1.22
     parameters:
       GOARCH:
         type: string
@@ -30,7 +30,7 @@ jobs:
           command: GOARCH=<< parameters.GOARCH >> GOOS=<< parameters.GOOS >> go build -o ./${CIRCLE_PROJECT_REPONAME} -v -ldflags="-w -s"
   build:
     docker: 
-      - image: cimg/go:1.21
+      - image: cimg/go:1.22
     parameters:
       GOARCH:
         type: string

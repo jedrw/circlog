@@ -2,7 +2,6 @@ package tui
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/lupinelab/circlog/circleci"
 	"github.com/rivo/tview"
 )
 
@@ -12,9 +11,7 @@ func (cTui *CirclogTui) initProjectSelect() {
 
 	cTui.projectSelect.SetLabel("Project: ").SetDoneFunc(func(key tcell.Key) {
 		cTui.config.Project = cTui.projectSelect.GetText()
-		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
-		cTui.pipelines.populateTable(pipelines, nextPageToken)
-		cTui.pipelines.table.ScrollToBeginning()
+		cTui.pipelines.update <- true
 		cTui.app.SetFocus(cTui.pipelines.table)
 	})
 

@@ -11,10 +11,11 @@ import (
 )
 
 type logsPane struct {
-	view        *tview.TextView
-	autoScroll  bool
-	watchCtx    context.Context
-	watchCancel context.CancelFunc
+	view       *tview.TextView
+	autoScroll bool
+	update     chan bool
+	syncCtx    context.Context
+	syncCancel context.CancelFunc
 }
 
 func (cTui *CirclogTui) newLogsPane() logsPane {
@@ -27,30 +28,23 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 		switch event.Key() {
 
 		case tcell.KeyEsc:
-			cTui.logs.watchCancel()
-			cTui.steps.restartWatcher(cTui, func() {
-				if cTui.steps.follow {
-					cTui.steps.follow = false
-					cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-				}
+			cTui.updateState <- circleci.Action{}
+			if cTui.steps.follow {
+				cTui.steps.follow = false
+				cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
+			}
 
-				view.Clear()
-				view.SetBorderColor(tcell.ColorGrey)
-
-				cTui.app.SetFocus(cTui.steps.tree)
-			})
+			view.Clear()
+			view.SetBorderColor(tcell.ColorGrey)
+			cTui.app.SetFocus(cTui.steps.tree)
 
 			return event
 
 		case tcell.KeyUp:
-			cTui.logs.restartWatcher(cTui, func() {
-				cTui.logs.autoScroll = false
-				view.SetTitle(" LOGS - Autoscroll Disabled ")
-				cTui.steps.restartWatcher(cTui, func() {
-					cTui.steps.follow = false
-					cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-				})
-			})
+			cTui.logs.autoScroll = false
+			view.SetTitle(" LOGS - Autoscroll Disabled ")
+			cTui.steps.follow = false
+			cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
 
 			return event
 		}
@@ -58,27 +52,18 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 		switch event.Rune() {
 
 		case 'f':
-			toggleFollow(cTui)
+			cTui.steps.toggleFollow(cTui)
 
 		case 'a':
-			cTui.logs.restartWatcher(cTui, func() {
-				cTui.logs.autoScroll = !cTui.logs.autoScroll
-				cTui.steps.restartWatcher(cTui, func() {
-					if cTui.logs.autoScroll {
-						view.SetTitle(" LOGS - Autoscroll Enabled ")
-						view.ScrollToEnd()
-					} else {
-						cTui.steps.follow = false
-						cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-						view.SetTitle(" LOGS - Autoscroll Disabled ")
-					}
-				})
-			})
-
-		case 'b':
-			cTui.clearAll()
-			cTui.config.Branch = ""
-			cTui.app.SetFocus(cTui.branchSelect)
+			cTui.logs.autoScroll = !cTui.logs.autoScroll
+			if cTui.logs.autoScroll {
+				view.SetTitle(" LOGS - Autoscroll Enabled ")
+				view.ScrollToEnd()
+			} else {
+				cTui.steps.follow = false
+				cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
+				view.SetTitle(" LOGS - Autoscroll Disabled ")
+			}
 
 		case 'd':
 			cTui.app.Stop()
@@ -95,29 +80,54 @@ func (cTui *CirclogTui) newLogsPane() logsPane {
 	})
 
 	view.SetFocusFunc(func() {
-		cTui.logs.restartWatcher(cTui, func() {
+		cTui.logs.restartSync(func() {
 			view.SetBorderColor(tcell.ColorDefault)
-			cTui.paneControls.SetText(`Toggle Autoscroll        [A]`)
+			cTui.paneControls.SetText("Toggle Autoscroll        [A]")
 		})
 	})
 
-	watchCtx, watchCancel := context.WithCancel(context.Background())
+	syncCtx, syncCancel := context.WithCancel(context.Background())
 
-	return logsPane{
-		view:        view,
-		autoScroll:  true,
-		watchCtx:    watchCtx,
-		watchCancel: watchCancel,
+	logsPane := logsPane{
+		view:       view,
+		autoScroll: true,
+		syncCtx:    syncCtx,
+		syncCancel: syncCancel,
 	}
+
+	logsPane.update = logsPane.updater(cTui)
+
+	return logsPane
 }
 
-func (l *logsPane) watchLogs(ctx context.Context, cTui *CirclogTui) {
-	logsChan := make(chan string)
+func (l *logsPane) syncLogs(ctx context.Context) {
 	ticker := time.NewTicker(refreshInterval)
 
 LOOP:
 	for {
-		go func() {
+		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			break LOOP
+
+		case <-ticker.C:
+			l.update <- true
+		}
+	}
+}
+
+func (l *logsPane) restartSync(fn func()) {
+	l.syncCancel()
+	fn()
+	l.syncCtx, l.syncCancel = context.WithCancel(context.TODO())
+	go l.syncLogs(l.syncCtx)
+}
+
+func (l *logsPane) updater(cTui *CirclogTui) chan bool {
+	updateChan := make(chan bool)
+
+	go func() {
+		for <-updateChan {
 			logs, _ := circleci.GetStepLogs(
 				cTui.config,
 				cTui.state.job.JobNumber,
@@ -125,39 +135,21 @@ LOOP:
 				cTui.state.action.Index,
 				cTui.state.action.AllocationId,
 			)
-
-			logsChan <- logs
-		}()
-
-		select {
-		case <-ctx.Done():
-			ticker.Stop()
-			break LOOP
-
-		case logs := <-logsChan:
 			cTui.app.QueueUpdateDraw(func() {
 				row, col := l.view.GetScrollOffset()
-				l.updateLogsView(logs)
+				l.setLogsViewText(logs)
 				if l.autoScroll {
 					l.view.ScrollToEnd()
 				} else {
 					l.view.ScrollTo(row, col)
 				}
 			})
-
-			<-ticker.C
 		}
-	}
+	}()
 
+	return updateChan
 }
 
-func (l *logsPane) restartWatcher(cTui *CirclogTui, fn func()) {
-	l.watchCancel()
-	fn()
-	l.watchCtx, l.watchCancel = context.WithCancel(context.TODO())
-	go l.watchLogs(l.watchCtx, cTui)
-}
-
-func (l *logsPane) updateLogsView(logs string) {
+func (l *logsPane) setLogsViewText(logs string) {
 	l.view.SetText(tview.TranslateANSI(logs))
 }
