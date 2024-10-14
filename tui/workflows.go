@@ -20,6 +20,7 @@ type workflowsPane struct {
 func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
 	table := tview.NewTable()
 	table.SetTitle(" WORKFLOWS ")
+	table.SetBackgroundColor(tcell.ColorDefault)
 	table.SetBorder(true)
 	table.SetBorderColor(tcell.ColorGrey)
 	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)

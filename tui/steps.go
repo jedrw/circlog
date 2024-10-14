@@ -20,6 +20,7 @@ type stepsPane struct {
 func (cTui *CirclogTui) newStepsPane() stepsPane {
 	tree := tview.NewTreeView()
 	tree.SetTitle(" STEPS - Follow Disabled ")
+	tree.SetBackgroundColor(tcell.ColorDefault)
 	tree.SetBorder(true)
 	tree.SetBorderColor(tcell.ColorGrey)
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
@@ -77,7 +78,7 @@ func (cTui *CirclogTui) newStepsPane() stepsPane {
 	tree.SetFocusFunc(func() {
 		cTui.steps.restartWatcher(cTui, func() {
 			tree.SetBorderColor(tcell.ColorDefault)
-			cTui.paneControls.SetText(`Toggle Follow            [F]`)
+			cTui.paneControls.SetText("Toggle Follow\t[F]")
 		})
 	})
 

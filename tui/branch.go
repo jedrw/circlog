@@ -8,7 +8,10 @@ import (
 
 func (cTui *CirclogTui) initBranchSelect() {
 	cTui.branchSelect = tview.NewInputField().SetText(cTui.config.Branch).SetFieldWidth(30)
-	cTui.branchSelect.SetLabelColor(tcell.ColorDefault)
+	cTui.branchSelect.SetLabelStyle(
+		tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset),
+	)
+	cTui.branchSelect.SetFieldBackgroundColor(tcell.ColorDefault)
 
 	cTui.branchSelect.SetLabel("Branch: ").SetDoneFunc(func(key tcell.Key) {
 		cTui.config.Branch = cTui.branchSelect.GetText()

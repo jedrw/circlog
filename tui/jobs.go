@@ -21,6 +21,7 @@ type jobsPane struct {
 func (cTui *CirclogTui) newJobsPane() jobsPane {
 	table := tview.NewTable()
 	table.SetTitle(" JOBS ")
+	table.SetBackgroundColor(tcell.ColorDefault)
 	table.SetBorder(true)
 	table.SetBorderColor(tcell.ColorGrey)
 	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)

@@ -20,6 +20,7 @@ type pipelinesPane struct {
 func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 	table := tview.NewTable()
 	table.SetTitle(" PIPELINES ")
+	table.SetBackgroundColor(tcell.ColorDefault)
 	table.SetBorder(true)
 	table.SetBorderColor(tcell.ColorGrey)
 	table.SetSelectable(true, false).SetFixed(1, 0).SetSeparator(tview.Borders.Vertical)
@@ -100,7 +101,7 @@ func (cTui *CirclogTui) newPipelinesPane() pipelinesPane {
 	table.SetFocusFunc(func() {
 		cTui.pipelines.restartWatcher(cTui, func() {
 			table.SetBorderColor(tcell.ColorDefault)
-			cTui.paneControls.SetText(`Filter by branch         [V]`)
+			cTui.paneControls.SetText("Filter by branch\t[V]")
 		})
 	})
 

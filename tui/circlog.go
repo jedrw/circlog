@@ -111,9 +111,11 @@ func (cTui *CirclogTui) initNavLayout() {
 	cTui.layout.SetBackgroundColor(tcell.ColorDefault)
 
 	cTui.heading = tview.NewFlex().SetDirection(tview.FlexColumn)
+	cTui.heading.SetBackgroundColor(tcell.ColorDefault)
 	cTui.layout.AddItem(cTui.heading, 5, 0, false)
 
 	cTui.info = tview.NewFlex().SetDirection(tview.FlexRow)
+	cTui.info.SetBackgroundColor(tcell.ColorDefault)
 	cTui.heading.AddItem(cTui.info, 0, 1, false)
 
 	cTui.initProjectSelect()
@@ -123,50 +125,23 @@ func (cTui *CirclogTui) initNavLayout() {
 	cTui.info.AddItem(cTui.branchSelect, 1, 1, false)
 
 	cTui.configText = tview.NewTextView().SetText(fmt.Sprintf("Organisation: %s", cTui.config.Org))
+	cTui.configText.SetBackgroundColor(tcell.ColorDefault)
 	cTui.info.AddItem(cTui.configText, 0, 1, false)
 
 	cTui.paneControls = tview.NewTextView().SetTextAlign(tview.AlignRight)
+	cTui.paneControls.SetBackgroundColor(tcell.ColorDefault)
 	cTui.heading.AddItem(cTui.paneControls, 0, 4, false)
 
 	cTui.globalControls = tview.NewTextView().SetTextAlign(tview.AlignRight)
-	cTui.globalControls.SetText(`Move	           [Up/Down]
-	Select               [Enter]
-	Dump command             [D]
-	Branch Select            [B]
-	Back/Quit              [Esc]
-	`)
+	cTui.globalControls.SetBackgroundColor(tcell.ColorDefault)
+	cTui.globalControls.SetText("Move   \t[Up/Down]\nSelect   \t[Enter]\nDump command \t[D]\nBranch Select\t[B]\nBack/Quit  \t[Esc]")
 	cTui.heading.AddItem(cTui.globalControls, 0, 1, false)
 
 	cTui.upperNav = tview.NewFlex().SetDirection(tview.FlexColumn)
+	cTui.upperNav.SetBackgroundColor(tcell.ColorDefault)
 	cTui.layout.AddItem(cTui.upperNav, 0, 2, false)
 
 	cTui.lowerNav = tview.NewFlex().SetDirection(tview.FlexColumn)
+	cTui.lowerNav.SetBackgroundColor(tcell.ColorDefault)
 	cTui.layout.AddItem(cTui.lowerNav, 0, 3, false)
-}
-
-func toggleFollow(cTui *CirclogTui) {
-	cTui.logs.restartWatcher(cTui, func() {
-		cTui.steps.restartWatcher(cTui, func() {
-			if !cTui.steps.follow {
-				cTui.steps.follow = true
-				cTui.logs.autoScroll = true
-				cTui.steps.tree.SetTitle(" STEPS - Follow Enabled ")
-				cTui.logs.view.SetTitle(" LOGS - Autoscroll Enabled ")
-				steps := cTui.steps.tree.GetRoot().GetChildren()
-				latestStepActions := steps[len(steps)-1].GetChildren()
-				for n := len(latestStepActions) - 1; n >= 0; n-- {
-					if n == 0 {
-						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-						cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
-					} else if latestStepActions[n].GetReference().(circleci.Action).Status == "running" {
-						cTui.steps.tree.SetCurrentNode(latestStepActions[n])
-						cTui.state.action = latestStepActions[n].GetReference().(circleci.Action)
-					}
-				}
-			} else {
-				cTui.steps.follow = false
-				cTui.steps.tree.SetTitle(" STEPS - Follow Disabled ")
-			}
-		})
-	})
 }
