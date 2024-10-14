@@ -51,6 +51,7 @@ var (
 		"success":      tcell.ColorDarkGreen,
 		"running":      tcell.ColorLightGreen,
 		"not_run":      tcell.ColorGray,
+		"blocked":      tcell.ColorGray,
 		"failed":       tcell.ColorDarkRed,
 		"error":        tcell.ColorDarkRed,
 		"failing":      tcell.ColorPink,
@@ -58,7 +59,7 @@ var (
 		"canceled":     tcell.ColorDarkRed,
 		"unauthorized": tcell.ColorDarkRed,
 
-		"created": tcell.ColorLightGreen,
+		"created": tcell.ColorDarkGreen,
 	}
 )
 
