@@ -5,11 +5,13 @@ import (
 	"fmt"
 )
 
-func outputJson(input any) {
+func outputJson(input any) error {
 	j, err := json.MarshalIndent(input, "", "  ")
 	if err != nil {
-		fmt.Println(err.Error())
+		return err
 	}
 
 	fmt.Println(string(j))
+
+	return nil
 }

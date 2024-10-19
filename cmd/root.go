@@ -6,11 +6,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var cmdConfig config.CirclogConfig 
+
 var rootCmd = &cobra.Command{
 	Use:   "circlog [project]",
 	Short: "CircleCI CLI tool",
 	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	PersistentPreRunE: func (cmd *cobra.Command, args []string) error {
 		var project string
 
 		if len(args) > 0 {
@@ -23,12 +25,13 @@ var rootCmd = &cobra.Command{
 		org, _ := cmd.Flags().GetString("org")
 		branch, _ := cmd.Flags().GetString("branch")
 
-		config, err := config.NewConfig(project, vcs, org, branch)
-		if err != nil {
-			return err
-		}
-
-		circlogTui := tui.NewCirclogTui(config)
+		var err error
+		cmdConfig, err = config.NewConfig(project, vcs, org, branch)
+		
+		return err
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		circlogTui := tui.NewCirclogTui(cmdConfig)
 
 		return circlogTui.Run()
 	},

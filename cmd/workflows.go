@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/lupinelab/circlog/circleci"
-	"github.com/lupinelab/circlog/config"
 	"github.com/spf13/cobra"
 )
 
@@ -12,27 +9,15 @@ var workflowsCmd = &cobra.Command{
 	Use:   "workflows [project]",
 	Short: "Get the workflows for a pipeline",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		project := args[0]
-		vcs, _ := cmd.Flags().GetString("vcs")
-		org, _ := cmd.Flags().GetString("org")
-		branch, _ := cmd.Flags().GetString("branch")
+	RunE: func(cmd *cobra.Command, args []string) error {
 		numPages, _ := cmd.Flags().GetInt("number-pages")
-
 		pipelineId, _ := cmd.Flags().GetString("pipeline-id")
-
-		config, err := config.NewConfig(project, vcs, org, branch)
+		pipelineWorkflows, _, err := circleci.GetPipelineWorkflows(cmdConfig, pipelineId, numPages, "")
 		if err != nil {
-			fmt.Println(err.Error())
-			return
+			return err
 		}
 
-		pipelineWorkflows, _, err := circleci.GetPipelineWorkflows(config, pipelineId, numPages, "")
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-
-		outputJson(pipelineWorkflows)
+		return outputJson(pipelineWorkflows)
 	},
 }
 

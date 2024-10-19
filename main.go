@@ -1,9 +1,16 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/lupinelab/circlog/cmd"
 )
 
 func main() {
-	cmd.Execute()
+	err := cmd.Execute()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
