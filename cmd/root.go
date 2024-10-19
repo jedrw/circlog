@@ -47,6 +47,7 @@ func init() {
 	rootCmd.PersistentFlags().IntP("number-pages", "n", 1, "Number of pages to return. -1 to return everything, this may take a long time if the project has many pipelines")
 	rootCmd.Flags().StringP("branch", "b", "", "Branch")
 
+	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(pipelinesCmd)
 	rootCmd.AddCommand(workflowsCmd)
 	rootCmd.AddCommand(jobsCmd)

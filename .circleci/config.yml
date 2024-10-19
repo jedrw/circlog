@@ -1,15 +1,15 @@
 version: 2.1
 
-jobs: 
+jobs:
   test_build:
-    docker: 
+    docker:
       - image: cimg/go:1.21
     parameters:
       GOARCH:
         type: string
       GOOS:
         type: string
-    steps: 
+    steps:
       - run:
           name: Install upx
           command: sudo apt update && sudo apt install upx -y
@@ -25,18 +25,18 @@ jobs:
           key: go-mod-v1-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
-      - run: 
+      - run:
           name: Build
           command: GOARCH=<< parameters.GOARCH >> GOOS=<< parameters.GOOS >> go build -o ./${CIRCLE_PROJECT_REPONAME} -v -ldflags="-w -s"
   build:
-    docker: 
+    docker:
       - image: cimg/go:1.21
     parameters:
       GOARCH:
         type: string
       GOOS:
         type: string
-    steps: 
+    steps:
       - checkout
       - restore_cache:
           keys:
@@ -49,24 +49,30 @@ jobs:
           key: go-mod-v1-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
-      - run: 
+      - run:
           name: Build
-          command: GOARCH=<< parameters.GOARCH >> GOOS=<< parameters.GOOS >> go build -o ./${CIRCLE_PROJECT_REPONAME} -v -ldflags="-w -s"
+          command: |
+            GOARCH=<< parameters.GOARCH >> \
+            GOOS=<< parameters.GOOS >> \
+            go build \
+              -o ./${CIRCLE_PROJECT_REPONAME} \
+              -v \
+              -ldflags="-w -s -X github.com/lupinelab/circlog/cmd.version=$(git describe --tags --always)"
       - run:
           name: Package
           command: mkdir ./build && tar cvfz ./build/${CIRCLE_PROJECT_REPONAME}_${CIRCLE_TAG}_<< parameters.GOOS >>_<< parameters.GOARCH >>.tar.gz ./${CIRCLE_PROJECT_REPONAME}
       - persist_to_workspace:
           root: build
-          paths: 
+          paths:
             - ./*
   release:
-    docker: 
-        - image: cimg/base:current
+    docker:
+      - image: cimg/base:current
     steps:
       - attach_workspace:
           at: ./
       - run:
-          name: Release    
+          name: Release
           command: |
             curl -v \
               -X POST \
@@ -111,7 +117,7 @@ workflows:
               GOARCH: ["amd64", "arm64"]
           filters:
             branches:
-                ignore: /.*/
+              ignore: /.*/
             tags:
               only: /\d+\.\d+\.\d+/
       - release:
