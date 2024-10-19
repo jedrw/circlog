@@ -1,33 +1,6 @@
 version: 2.1
 
 jobs:
-  test_build:
-    docker:
-      - image: cimg/go:1.21
-    parameters:
-      GOARCH:
-        type: string
-      GOOS:
-        type: string
-    steps:
-      - run:
-          name: Install upx
-          command: sudo apt update && sudo apt install upx -y
-      - checkout
-      - restore_cache:
-          keys:
-            - go-mod-v1-{{ checksum "go.sum" }}
-            - go-mod-v1
-      - run:
-          name: Install Dependencies
-          command: go get ./...
-      - save_cache:
-          key: go-mod-v1-{{ checksum "go.sum" }}
-          paths:
-            - "/go/pkg/mod"
-      - run:
-          name: Build
-          command: GOARCH=<< parameters.GOARCH >> GOOS=<< parameters.GOOS >> go build -o ./${CIRCLE_PROJECT_REPONAME} -v -ldflags="-w -s"
   build:
     docker:
       - image: cimg/go:1.21
@@ -101,14 +74,7 @@ jobs:
             done
 
 workflows:
-  build:
-    jobs:
-      - test_build:
-          matrix:
-            parameters:
-              GOOS: ["linux", "darwin"]
-              GOARCH: ["amd64", "arm64"]
-  build_and_release:
+  cicd:
     jobs:
       - build:
           matrix:
@@ -116,10 +82,8 @@ workflows:
               GOOS: ["linux", "darwin"]
               GOARCH: ["amd64", "arm64"]
           filters:
-            branches:
-              ignore: /.*/
             tags:
-              only: /\d+\.\d+\.\d+/
+              only: /v\d+\.\d+\.\d+/
       - release:
           context:
             - github
@@ -129,4 +93,4 @@ workflows:
             branches:
               ignore: /.*/
             tags:
-              only: /\d+\.\d+\.\d+/
+              only: /v\d+\.\d+\.\d+/
