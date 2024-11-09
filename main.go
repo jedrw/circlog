@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lupinelab/circlog/cmd"
+	"github.com/jedrw/circlog/cmd"
 )
 
 func main() {

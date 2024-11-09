@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/lupinelab/circlog/config"
+	"github.com/jedrw/circlog/config"
 )
 
 func GetStepLogs(config config.CirclogConfig, jobNumber int64, stepNumber int64, stepIndex int64, allocationId string) (string, error) {

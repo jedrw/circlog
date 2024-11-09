@@ -30,7 +30,7 @@ jobs:
             go build \
               -o ./${CIRCLE_PROJECT_REPONAME} \
               -v \
-              -ldflags="-w -s -X github.com/lupinelab/circlog/cmd.version=$(git describe --tags --always)"
+              -ldflags="-w -s -X github.com/jedrw/circlog/cmd.version=$(git describe --tags --always)"
       - run:
           name: Package
           command: mkdir ./build && tar cvfz ./build/${CIRCLE_PROJECT_REPONAME}_${CIRCLE_TAG}_<< parameters.GOOS >>_<< parameters.GOARCH >>.tar.gz ./${CIRCLE_PROJECT_REPONAME}
@@ -52,14 +52,14 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/lupinelab/${CIRCLE_PROJECT_REPONAME}/releases \
+              https://api.github.com/repos/jedrw/${CIRCLE_PROJECT_REPONAME}/releases \
               -d '{"tag_name":"'$CIRCLE_TAG'","draft":false,"prerelease":false}'
 
             RELEASE_ID=$(curl -s \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/lupinelab/${CIRCLE_PROJECT_REPONAME}/releases/tags/${CIRCLE_TAG} \
+              https://api.github.com/repos/jedrw/${CIRCLE_PROJECT_REPONAME}/releases/tags/${CIRCLE_TAG} \
               | jq '.id') 
 
             for ASSET in *.gz; do
@@ -69,7 +69,7 @@ jobs:
                 -H "Authorization: Bearer $GITHUB_TOKEN"\
                 -H "X-GitHub-Api-Version: 2022-11-28" \
                 -H "Content-Type: $(file -b --mime-type ${ASSET})" \
-                https://uploads.github.com/repos/lupinelab/${CIRCLE_PROJECT_REPONAME}/releases/$RELEASE_ID/assets?name=$(basename ${ASSET}) \
+                https://uploads.github.com/repos/jedrw/${CIRCLE_PROJECT_REPONAME}/releases/$RELEASE_ID/assets?name=$(basename ${ASSET}) \
                 --data-binary @${ASSET};
             done
 

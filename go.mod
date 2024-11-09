@@ -1,4 +1,4 @@
-module github.com/lupinelab/circlog
+module github.com/jedrw/circlog
 
 go 1.20
 

@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/lupinelab/circlog/config"
+	"github.com/jedrw/circlog/config"
 )
 
 const (

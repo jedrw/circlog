@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lupinelab/circlog/config"
+	"github.com/jedrw/circlog/config"
 )
 
 type JobDetails struct {

@@ -1,18 +1,18 @@
 package cmd
 
 import (
-	"github.com/lupinelab/circlog/config"
-	"github.com/lupinelab/circlog/tui"
+	"github.com/jedrw/circlog/config"
+	"github.com/jedrw/circlog/tui"
 	"github.com/spf13/cobra"
 )
 
-var cmdConfig config.CirclogConfig 
+var cmdConfig config.CirclogConfig
 
 var rootCmd = &cobra.Command{
 	Use:   "circlog [project]",
 	Short: "CircleCI CLI tool",
 	Args:  cobra.MaximumNArgs(1),
-	PersistentPreRunE: func (cmd *cobra.Command, args []string) error {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var project string
 
 		if len(args) > 0 {
@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 
 		var err error
 		cmdConfig, err = config.NewConfig(project, vcs, org, branch)
-		
+
 		return err
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {

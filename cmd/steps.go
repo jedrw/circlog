@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/lupinelab/circlog/circleci"
+	"github.com/jedrw/circlog/circleci"
 	"github.com/spf13/cobra"
 )
 

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/lupinelab/circlog/circleci"
+	"github.com/jedrw/circlog/circleci"
 	"github.com/rivo/tview"
 )
 

@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/lupinelab/circlog/circleci"
+import "github.com/jedrw/circlog/circleci"
 
 func toggleFollow(cTui *CirclogTui) {
 	cTui.logs.restartWatcher(cTui, func() {
