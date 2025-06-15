@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -11,15 +12,20 @@ import (
 )
 
 type tuiState struct {
-	pipeline circleci.Pipeline
-	workflow circleci.Workflow
-	job      circleci.Job
-	action   circleci.Action
+	mu            sync.RWMutex
+	follow        bool
+	autoScroll    bool
+	pipeline      circleci.Pipeline
+	pipelinePages int
+	workflow      circleci.Workflow
+	workflowPages int
+	job           circleci.Job
+	jobPages      int
+	action        circleci.Action
 }
 
 type CirclogTui struct {
-	app *tview.Application
-
+	app    *tview.Application
 	config config.CirclogConfig
 	state  tuiState
 
@@ -35,16 +41,14 @@ type CirclogTui struct {
 	paneControls   *tview.TextView
 	globalControls *tview.TextView
 
-	pipelines pipelinesPane
-	workflows workflowsPane
-	jobs      jobsPane
-	steps     stepsPane
-	logs      logsPane
+	pipelinesPane *tview.Table
+	workflowsPane *tview.Table
+	jobsPane      *tview.Table
+	stepsPane     *tview.TreeView
+	logsPane      *tview.TextView
 
 	colourByStatus map[string]tcell.Color
 }
-
-const refreshInterval = 1 * time.Second
 
 var (
 	colourByStatus = map[string]tcell.Color{
@@ -68,39 +72,14 @@ func NewCirclogTui(config config.CirclogConfig) CirclogTui {
 	return CirclogTui{
 		config:         config,
 		colourByStatus: colourByStatus,
+		state: tuiState{
+			follow:        false,
+			autoScroll:    true,
+			pipelinePages: 1,
+			workflowPages: 1,
+			jobPages:      1,
+		},
 	}
-}
-
-func (cTui *CirclogTui) Run() error {
-	cTui.app = tview.NewApplication()
-
-	cTui.initNavLayout()
-
-	cTui.pipelines = cTui.newPipelinesPane()
-	cTui.upperNav.AddItem(cTui.pipelines.table, 0, 1, false)
-
-	cTui.workflows = cTui.newWorkflowsPane()
-	cTui.upperNav.AddItem(cTui.workflows.table, 0, 1, false)
-
-	cTui.jobs = cTui.newJobsPane()
-	cTui.upperNav.AddItem(cTui.jobs.table, 0, 1, false)
-
-	cTui.steps = cTui.newStepsPane()
-	cTui.lowerNav.AddItem(cTui.steps.tree, 0, 1, false)
-
-	cTui.logs = cTui.newLogsPane()
-	cTui.lowerNav.AddItem(cTui.logs.view, 0, 2, false)
-
-	if cTui.config.Project != "" {
-		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
-		cTui.pipelines.populateTable(pipelines, nextPageToken)
-		cTui.app.SetRoot(cTui.layout, true).SetFocus(cTui.pipelines.table)
-	} else {
-		cTui.app.SetRoot(cTui.layout, true).SetFocus(cTui.info)
-
-	}
-
-	return cTui.app.Run()
 }
 
 func (cTui *CirclogTui) initNavLayout() {
@@ -146,4 +125,67 @@ func (cTui *CirclogTui) initNavLayout() {
 	cTui.lowerNav = tview.NewFlex().SetDirection(tview.FlexColumn)
 	cTui.lowerNav.SetBackgroundColor(tcell.ColorDefault)
 	cTui.layout.AddItem(cTui.lowerNav, 0, 3, false)
+}
+
+func (cTui *CirclogTui) Refresh() {
+	// TODO update everything
+	cTui.state.mu.Lock()
+	pipelines, pipelinesNextPageToken, _ := circleci.GetPipelines(cTui.config, cTui.state.pipelinePages, "")
+	workflows, workflowsNextPageToken, _ := circleci.GetWorkflows(cTui.config, cTui.state.pipeline.Id, cTui.state.workflowPages, "")
+	jobs, jobsNextPageToken, _ := circleci.GetJobs(cTui.config, cTui.state.workflow.Id, cTui.state.jobPages, "")
+	jobDetails, _ := circleci.GetSteps(cTui.config, cTui.state.job.JobNumber)
+	cTui.state.mu.Unlock()
+	// drawWorkflowsTable := cTui.workflowsPane.refresh(cTui)
+	// drawJobsTable := cTui.jobsPane.refresh(cTui)
+
+	cTui.app.QueueUpdateDraw(func() {
+		cTui.populatePipelinesTable(pipelines, pipelinesNextPageToken)
+		cTui.populateWorkflowsTable(workflows, workflowsNextPageToken)
+		cTui.populateJobsTable(jobs, jobsNextPageToken)
+		cTui.state.mu.RLock()
+		cTui.populateStepsTree(cTui.state.job, jobDetails)
+		cTui.state.mu.RUnlock()
+		cTui.upateStepsTree(jobDetails)
+	})
+}
+
+func (cTui *CirclogTui) Run() error {
+	cTui.app = tview.NewApplication()
+
+	cTui.initNavLayout()
+
+	cTui.pipelinesPane = cTui.newPipelinesPane()
+	cTui.upperNav.AddItem(cTui.pipelinesPane, 0, 1, false)
+
+	cTui.workflowsPane = cTui.newWorkflowsPane()
+	cTui.upperNav.AddItem(cTui.workflowsPane, 0, 1, false)
+
+	cTui.jobsPane = cTui.newJobsPane()
+	cTui.upperNav.AddItem(cTui.jobsPane, 0, 1, false)
+
+	cTui.stepsPane = cTui.newStepsPane()
+	cTui.lowerNav.AddItem(cTui.stepsPane, 0, 1, false)
+
+	cTui.logsPane = cTui.newLogsPane()
+	cTui.lowerNav.AddItem(cTui.logsPane, 0, 2, false)
+
+	if cTui.config.Project != "" {
+		pipelines, nextPageToken, _ := circleci.GetPipelines(cTui.config, 1, "")
+		cTui.populatePipelinesTable(pipelines, nextPageToken)
+		cTui.app.SetRoot(cTui.layout, true).SetFocus(cTui.pipelinesPane)
+	} else {
+		cTui.app.SetRoot(cTui.layout, true).SetFocus(cTui.info)
+	}
+
+	ticker := time.NewTicker(cTui.config.RefreshInterval)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				cTui.Refresh()
+			}
+		}
+	}()
+
+	return cTui.app.Run()
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
@@ -25,11 +26,12 @@ type circlogState struct {
 }
 
 type CirclogConfig struct {
-	Branch  string
-	Org     string `yaml:"organisation"`
-	Project string
-	Token   string
-	Vcs     string `yaml:"vcs"`
+	Branch          string
+	Org             string `yaml:"organisation"`
+	Project         string
+	Token           string
+	Vcs             string `yaml:"vcs"`
+	RefreshInterval time.Duration
 }
 
 func GetToken() (string, bool, error) {
@@ -205,6 +207,7 @@ func NewConfig(project string, vcs string, org string, branch string) (CirclogCo
 	config.Project = project
 	config.Token = token
 	config.Branch = branch
+	config.RefreshInterval = time.Second * 3
 
 	return config, nil
 }

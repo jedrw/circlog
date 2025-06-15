@@ -11,7 +11,7 @@ var stepsCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jobNumber, _ := cmd.Flags().GetInt64("job-number")
-		workflowJobs, err := circleci.GetJobSteps(cmdConfig, jobNumber)
+		workflowJobs, err := circleci.GetSteps(cmdConfig, jobNumber)
 		if err != nil {
 			return err
 		}

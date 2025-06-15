@@ -8,7 +8,7 @@ import (
 	"github.com/jedrw/circlog/config"
 )
 
-func GetStepLogs(config config.CirclogConfig, jobNumber int64, stepNumber int64, stepIndex int64, allocationId string) (string, error) {
+func GetLogs(config config.CirclogConfig, jobNumber int64, stepNumber int64, stepIndex int64, allocationId string) (string, error) {
 	url := fmt.Sprintf("%s/project/%s/%d/output/%d/%d?file=true&allocation-id=%s", CIRCLECI_ENDPOINT_V1, config.ProjectSlugV1(), jobNumber, stepNumber, stepIndex, allocationId)
 
 	req, err := http.NewRequest("GET", url, nil)

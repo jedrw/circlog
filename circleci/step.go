@@ -42,7 +42,7 @@ type Action struct {
 	Canceled           bool      `json:"canceled"`
 }
 
-func GetJobSteps(config config.CirclogConfig, jobNumber int64) (JobDetails, error) {
+func GetSteps(config config.CirclogConfig, jobNumber int64) (JobDetails, error) {
 	url := fmt.Sprintf("%s/project/%s/%d", CIRCLECI_ENDPOINT_V1, config.ProjectSlugV1(), jobNumber)
 
 	req, err := http.NewRequest("GET", url, nil)

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -11,14 +10,7 @@ import (
 	"github.com/rivo/tview"
 )
 
-type jobsPane struct {
-	table       *tview.Table
-	numPages    int
-	watchCtx    context.Context
-	watchCancel context.CancelFunc
-}
-
-func (cTui *CirclogTui) newJobsPane() jobsPane {
+func (cTui *CirclogTui) newJobsPane() *tview.Table {
 	table := tview.NewTable()
 	table.SetTitle(" JOBS ")
 	table.SetBackgroundColor(tcell.ColorDefault)
@@ -36,29 +28,30 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 		switch cellRef := cellRef.(type) {
 
 		case circleci.Job:
+			cTui.state.mu.Lock()
 			cTui.state.job = cellRef
-			jobDetails, _ := circleci.GetJobSteps(cTui.config, cTui.state.job.JobNumber)
-			cTui.steps.populateStepsTree(cTui.state.job, jobDetails)
-			cTui.app.SetFocus(cTui.steps.tree)
+			jobDetails, _ := circleci.GetSteps(cTui.config, cTui.state.job.JobNumber)
+			cTui.state.mu.Unlock()
+			cTui.populateStepsTree(cTui.state.job, jobDetails)
+			cTui.app.SetFocus(cTui.stepsPane)
 
 		case string:
 			if cell.Text == "..." {
-				cTui.jobs.restartWatcher(cTui, func() {
-					nextPageToken := cell.GetReference().(string)
-					newJobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.state.workflow.Id, 1, nextPageToken)
-					cTui.jobs.addJobsToTable(newJobs, table.GetRowCount()-1, nextPageToken)
-					cTui.jobs.numPages++
-				})
+				cTui.state.mu.Lock()
+				cTui.state.jobPages++
+				nextPageToken := cell.GetReference().(string)
+				newJobs, nextPageToken, _ := circleci.GetJobs(cTui.config, cTui.state.workflow.Id, 1, nextPageToken)
+				cTui.state.mu.Unlock()
+				cTui.addJobsToTable(newJobs, table.GetRowCount()-1, nextPageToken)
 			}
 		}
 	})
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			cTui.jobs.watchCancel()
-			cTui.jobs.clear()
+			cTui.clearJobsTable()
 			table.SetBorderColor(tcell.ColorGrey)
-			cTui.app.SetFocus(cTui.workflows.table)
+			cTui.app.SetFocus(cTui.workflowsPane)
 
 			return event
 		}
@@ -79,66 +72,19 @@ func (cTui *CirclogTui) newJobsPane() jobsPane {
 	})
 
 	table.SetFocusFunc(func() {
-		cTui.jobs.restartWatcher(cTui, func() {
-			table.SetBorderColor(tcell.ColorDefault)
-			cTui.paneControls.Clear()
-		})
+		table.SetBorderColor(tcell.ColorDefault)
+		cTui.paneControls.Clear()
 	})
 
-	watchCtx, watchCancel := context.WithCancel(context.Background())
-
-	return jobsPane{
-		table:       table,
-		numPages:    1,
-		watchCtx:    watchCtx,
-		watchCancel: watchCancel,
-	}
+	return table
 }
 
-func (j *jobsPane) watchJobs(ctx context.Context, cTui *CirclogTui) {
-	jobsChan := make(chan []circleci.Job)
-	nextPageTokenChan := make(chan string)
-	ticker := time.NewTicker(refreshInterval)
-
-LOOP:
-	for {
-		go func() {
-			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.state.workflow.Id, cTui.workflows.numPages, "")
-			jobsChan <- jobs
-			nextPageTokenChan <- nextPageToken
-		}()
-
-		select {
-		case <-ctx.Done():
-			ticker.Stop()
-			break LOOP
-
-		case jobs := <-jobsChan:
-			nextPageToken := <-nextPageTokenChan
-			cTui.app.QueueUpdateDraw(func() {
-				j.clear()
-				j.addJobsToTable(jobs, 1, nextPageToken)
-			})
-
-			<-ticker.C
-		}
-	}
+func (cTui *CirclogTui) populateJobsTable(jobs []circleci.Job, nextPageToken string) {
+	cTui.clearJobsTable()
+	cTui.addJobsToTable(jobs, cTui.jobsPane.GetRowCount(), nextPageToken)
 }
 
-func (j *jobsPane) restartWatcher(cTui *CirclogTui, fn func()) {
-	j.watchCancel()
-	fn()
-	j.watchCtx, j.watchCancel = context.WithCancel(context.TODO())
-	go j.watchJobs(j.watchCtx, cTui)
-}
-
-func (j *jobsPane) populateTable(jobs []circleci.Job, nextPageToken string) {
-	j.clear()
-	j.addJobsToTable(jobs, j.table.GetRowCount(), nextPageToken)
-
-}
-
-func (j *jobsPane) addJobsToTable(jobs []circleci.Job, startRow int, nextPageToken string) {
+func (cTui *CirclogTui) addJobsToTable(jobs []circleci.Job, startRow int, nextPageToken string) {
 	if len(jobs) != 0 {
 		for row, job := range jobs {
 			dependencies := getNamedJobDependencies(job, jobs)
@@ -161,19 +107,19 @@ func (j *jobsPane) addJobsToTable(jobs []circleci.Job, startRow int, nextPageTok
 			for column, attr := range []string{job.Name, jobDuration, dependenciesString} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(job.Status))
 				cell.SetReference(job)
-				j.table.SetCell(row+startRow, column, cell)
+				cTui.jobsPane.SetCell(row+startRow, column, cell)
 			}
 		}
 
 		if nextPageToken != "" {
 			cell := tview.NewTableCell("...").SetStyle(tcell.StyleDefault)
 			cell.SetReference(nextPageToken)
-			j.table.SetCell(j.table.GetRowCount(), 0, cell)
+			cTui.jobsPane.SetCell(cTui.jobsPane.GetRowCount(), 0, cell)
 		}
 
 	} else {
 		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
-		j.table.SetCell(1, 0, cell)
+		cTui.jobsPane.SetCell(1, 0, cell)
 	}
 }
 
@@ -190,9 +136,9 @@ func getNamedJobDependencies(job circleci.Job, jobs []circleci.Job) []string {
 	return namedDependencies
 }
 
-func (j *jobsPane) clear() {
+func (cTui *CirclogTui) clearJobsTable() {
 	row := 1
-	for row < j.table.GetRowCount() {
-		j.table.RemoveRow(row)
+	for row < cTui.jobsPane.GetRowCount() {
+		cTui.jobsPane.RemoveRow(row)
 	}
 }

@@ -15,10 +15,10 @@ func (cTui *CirclogTui) initBranchSelect() {
 
 	cTui.branchSelect.SetLabel("Branch: ").SetDoneFunc(func(key tcell.Key) {
 		cTui.config.Branch = cTui.branchSelect.GetText()
-		pipelines, nextPageToken, _ := circleci.GetProjectPipelines(cTui.config, 1, "")
-		cTui.pipelines.populateTable(pipelines, nextPageToken)
-		cTui.pipelines.table.ScrollToBeginning()
-		cTui.app.SetFocus(cTui.pipelines.table)
+		pipelines, nextPageToken, _ := circleci.GetPipelines(cTui.config, 1, "")
+		cTui.populatePipelinesTable(pipelines, nextPageToken)
+		cTui.pipelinesPane.ScrollToBeginning()
+		cTui.app.SetFocus(cTui.pipelinesPane)
 	})
 
 	cTui.branchSelect.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {

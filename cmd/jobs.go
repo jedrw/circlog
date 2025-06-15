@@ -12,7 +12,7 @@ var jobsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		numPages, _ := cmd.Flags().GetInt("number-pages")
 		workflowId, _ := cmd.Flags().GetString("workflow-id")
-		workflowJobs, _, err := circleci.GetWorkflowJobs(cmdConfig, workflowId, numPages, "")
+		workflowJobs, _, err := circleci.GetJobs(cmdConfig, workflowId, numPages, "")
 		if err != nil {
 			return err
 		}

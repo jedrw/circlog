@@ -46,7 +46,7 @@ type Organisation struct {
 	Name string `json:"name"`
 }
 
-func GetWorkflowJobs(config config.CirclogConfig, workflowId string, numPages int, nextPageToken string) ([]Job, string, error) {
+func GetJobs(config config.CirclogConfig, workflowId string, numPages int, nextPageToken string) ([]Job, string, error) {
 	url := fmt.Sprintf("%s/workflow/%s/job", CIRCLECI_ENDPOINT_V2, workflowId)
 
 	jobs, nextPageToken, err := MakeRequest[Job](url, config, numPages, nextPageToken)

@@ -19,23 +19,15 @@ func branchOrTag(pipeline circleci.Pipeline) string {
 }
 
 func (cTui *CirclogTui) clearAll() {
-	cTui.watchCancelAll()
+	cTui.state.mu.Lock()
+	cTui.state.jobPages = 1
+	cTui.state.workflowPages = 1
+	cTui.state.pipelinePages = 1
+	cTui.state.mu.Unlock()
 
-	cTui.jobs.numPages = 1
-	cTui.workflows.numPages = 1
-	cTui.pipelines.numPages = 1
-
-	cTui.logs.view.Clear()
-	cTui.steps.clear()
-	cTui.jobs.clear()
-	cTui.workflows.clear()
-	cTui.pipelines.clear()
-}
-
-func (cTui *CirclogTui) watchCancelAll() {
-	cTui.logs.watchCancel()
-	cTui.steps.watchCancel()
-	cTui.jobs.watchCancel()
-	cTui.workflows.watchCancel()
-	cTui.pipelines.watchCancel()
+	cTui.logsPane.Clear()
+	cTui.clearStepsTree()
+	cTui.clearJobsTable()
+	cTui.clearWorkflowsTable()
+	cTui.clearPipelinesTable()
 }

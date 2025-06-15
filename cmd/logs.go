@@ -16,7 +16,7 @@ var logsCmd = &cobra.Command{
 		stepNumber, _ := cmd.Flags().GetInt64("step-number")
 		stepIndex, _ := cmd.Flags().GetInt64("step-index")
 		allocationId, _ := cmd.Flags().GetString("allocation-id")
-		logs, err := circleci.GetStepLogs(cmdConfig, jobNumber, stepNumber, stepIndex, allocationId)
+		logs, err := circleci.GetLogs(cmdConfig, jobNumber, stepNumber, stepIndex, allocationId)
 		if err != nil {
 			return err
 		}

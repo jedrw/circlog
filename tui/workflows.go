@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -10,14 +9,7 @@ import (
 	"github.com/rivo/tview"
 )
 
-type workflowsPane struct {
-	table       *tview.Table
-	numPages    int
-	watchCtx    context.Context
-	watchCancel context.CancelFunc
-}
-
-func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
+func (cTui *CirclogTui) newWorkflowsPane() *tview.Table {
 	table := tview.NewTable()
 	table.SetTitle(" WORKFLOWS ")
 	table.SetBackgroundColor(tcell.ColorDefault)
@@ -35,29 +27,31 @@ func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
 		switch cellRef := cellRef.(type) {
 
 		case circleci.Workflow:
+			cTui.state.mu.Lock()
 			cTui.state.workflow = cellRef
-			jobs, nextPageToken, _ := circleci.GetWorkflowJobs(cTui.config, cTui.state.workflow.Id, 1, "")
-			cTui.jobs.populateTable(jobs, nextPageToken)
-			cTui.app.SetFocus(cTui.jobs.table)
+			jobs, nextPageToken, _ := circleci.GetJobs(cTui.config, cTui.state.workflow.Id, 1, "")
+			cTui.state.mu.Unlock()
+			cTui.populateJobsTable(jobs, nextPageToken)
+			cTui.app.SetFocus(cTui.jobsPane)
 
 		case string:
 			if cell.Text == "..." {
-				cTui.workflows.restartWatcher(cTui, func() {
-					nextPageToken := cell.GetReference().(string)
-					newWorkflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.state.pipeline.Id, 1, nextPageToken)
-					cTui.workflows.addWorkflowsToTable(newWorkflows, nextPageToken)
-					cTui.workflows.numPages++
-				})
+				cTui.state.mu.Lock()
+				cTui.state.workflowPages++
+				nextPageToken := cell.GetReference().(string)
+				newWorkflows, nextPageToken, _ := circleci.GetWorkflows(cTui.config, cTui.state.pipeline.Id, 1, nextPageToken)
+				cTui.state.mu.Unlock()
+				cTui.addWorkflowsToTable(newWorkflows, nextPageToken)
 			}
+
 		}
 	})
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEsc {
-			cTui.workflows.watchCancel()
-			cTui.workflows.clear()
+			cTui.clearWorkflowsTable()
 			table.SetBorderColor(tcell.ColorGrey)
-			cTui.app.SetFocus(cTui.pipelines.table)
+			cTui.app.SetFocus(cTui.pipelinesPane)
 
 			return event
 		}
@@ -78,65 +72,19 @@ func (cTui *CirclogTui) newWorkflowsPane() workflowsPane {
 	})
 
 	table.SetFocusFunc(func() {
-		cTui.workflows.restartWatcher(cTui, func() {
-			table.SetBorderColor(tcell.ColorDefault)
-			cTui.paneControls.Clear()
-		})
+		table.SetBorderColor(tcell.ColorDefault)
+		cTui.paneControls.Clear()
 	})
 
-	watchCtx, watchCancel := context.WithCancel(context.Background())
-
-	return workflowsPane{
-		table:       table,
-		numPages:    1,
-		watchCtx:    watchCtx,
-		watchCancel: watchCancel,
-	}
+	return table
 }
 
-func (w *workflowsPane) watchWorkflows(ctx context.Context, cTui *CirclogTui) {
-	workflowsChan := make(chan []circleci.Workflow)
-	nextPageTokenChan := make(chan string)
-	ticker := time.NewTicker(refreshInterval)
-
-LOOP:
-	for {
-		go func() {
-			workflows, nextPageToken, _ := circleci.GetPipelineWorkflows(cTui.config, cTui.state.pipeline.Id, cTui.pipelines.numPages, "")
-			workflowsChan <- workflows
-			nextPageTokenChan <- nextPageToken
-		}()
-
-		select {
-		case <-ctx.Done():
-			ticker.Stop()
-			break LOOP
-
-		case workflows := <-workflowsChan:
-			nextPageToken := <-nextPageTokenChan
-			cTui.app.QueueUpdateDraw(func() {
-				w.clear()
-				w.addWorkflowsToTable(workflows, nextPageToken)
-			})
-
-			<-ticker.C
-		}
-	}
+func (cTui *CirclogTui) populateWorkflowsTable(workflows []circleci.Workflow, nextPageToken string) {
+	cTui.clearWorkflowsTable()
+	cTui.addWorkflowsToTable(workflows, nextPageToken)
 }
 
-func (w *workflowsPane) restartWatcher(cTui *CirclogTui, fn func()) {
-	w.watchCancel()
-	fn()
-	w.watchCtx, w.watchCancel = context.WithCancel(context.TODO())
-	go w.watchWorkflows(w.watchCtx, cTui)
-}
-
-func (w *workflowsPane) populateWorkflowsTable(workflows []circleci.Workflow, nextPageToken string) {
-	w.clear()
-	w.addWorkflowsToTable(workflows, nextPageToken)
-}
-
-func (w *workflowsPane) addWorkflowsToTable(workflows []circleci.Workflow, nextPageToken string) {
+func (cTui *CirclogTui) addWorkflowsToTable(workflows []circleci.Workflow, nextPageToken string) {
 	if len(workflows) != 0 {
 		for row, workflow := range workflows {
 			var workflowDuration string
@@ -149,25 +97,25 @@ func (w *workflowsPane) addWorkflowsToTable(workflows []circleci.Workflow, nextP
 			for column, attr := range []string{workflow.Name, workflowDuration} {
 				cell := tview.NewTableCell(attr).SetStyle(styleForStatus(workflow.Status))
 				cell.SetReference(workflow)
-				w.table.SetCell(row+1, column, cell)
+				cTui.workflowsPane.SetCell(row+1, column, cell)
 			}
 		}
 
 		if nextPageToken != "" {
 			cell := tview.NewTableCell("...")
 			cell.SetReference(nextPageToken)
-			w.table.SetCell(w.table.GetRowCount(), 0, cell)
+			cTui.workflowsPane.SetCell(cTui.workflowsPane.GetRowCount(), 0, cell)
 		}
 
 	} else {
 		cell := tview.NewTableCell("None").SetStyle(tcell.StyleDefault.Background(tcell.ColorDefault).Foreground(tcell.ColorDarkGray))
-		w.table.SetCell(1, 0, cell)
+		cTui.workflowsPane.SetCell(1, 0, cell)
 	}
 }
 
-func (w *workflowsPane) clear() {
+func (cTui *CirclogTui) clearWorkflowsTable() {
 	row := 1
-	for row < w.table.GetRowCount() {
-		w.table.RemoveRow(row)
+	for row < cTui.workflowsPane.GetRowCount() {
+		cTui.workflowsPane.RemoveRow(row)
 	}
 }

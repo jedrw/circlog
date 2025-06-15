@@ -11,7 +11,7 @@ var pipelinesCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		numPages, _ := cmd.Flags().GetInt("number-pages")
-		projectPipelines, _, err := circleci.GetProjectPipelines(cmdConfig, numPages, "")
+		projectPipelines, _, err := circleci.GetPipelines(cmdConfig, numPages, "")
 		if err != nil {
 			return err
 		}
